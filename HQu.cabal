@@ -14,20 +14,15 @@ category:            Finance,Math
 build-type:          Simple
 extra-doc-files:     README.md
                      CHANGELOG.md
-tested-with:         GHC == 8.4.4
-                     GHC == 8.6.5
-                     GHC == 8.8.3
+tested-with:         GHC == 8.10.4
 
 source-repository head
   type:                git
   location:            https://github.com/ghais/HQu.git
 
 common common-options
-  build-depends:       base >= 4.11.1.0 && < 4.14
-                     , relude
+  build-depends:       base >= 4.11.1.0 && < 5
   
-  mixins:              base hiding (Prelude)
-                     , relude (Relude as Prelude)
   
   ghc-options:         -Wall
                        -Wcompat
