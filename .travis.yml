@@ -23,10 +23,6 @@ before_install:
 script:
 - stack --no-terminal --install-ghc test
 
-# Prepare the upload to S3
-- mkdir -p to-travis
-- cp $(stack exec which wai-crowd) to-travis
-- bzip2 to-travis/wai-crowd
 
 # Caching so the next build will be fast too.
 cache:
