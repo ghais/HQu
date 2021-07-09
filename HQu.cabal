@@ -164,7 +164,7 @@ library
        if arch(x86_64)
             cc-options: -fPIC
  extra-libraries: gsl
- --pkgconfig-depends: gsl
+ pkgconfig-depends: gsl
 
 test-suite bachelier-test
   import:              common-options
