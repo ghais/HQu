@@ -163,8 +163,8 @@ library
  if os(linux)
        if arch(x86_64)
             cc-options: -fPIC
-
- pkgconfig-depends: gsl
+ extra-libraries: gsl
+ --pkgconfig-depends: gsl
 
 test-suite bachelier-test
   import:              common-options
