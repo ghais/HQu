@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                HQu
-version:             0.0.0.3
+version:             0.0.0.4
 synopsis:            quantitative finance library
 description:         General purpose quantitative finance library
 homepage:            https://github.com/ghais/HQu
@@ -23,7 +23,7 @@ source-repository head
   location:            https://github.com/ghais/HQu.git
 
 common common-options
-  build-depends:       base >= 4.11.1.0 && < 5
+  build-depends:       base >= 4.11.0 && < 5
   
   
   ghc-options:         -Wall
