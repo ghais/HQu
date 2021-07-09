@@ -18,3 +18,11 @@ script:
 cache:
   directories:
   - "$HOME/.stack"
+deploy:
+  provider: hackage
+  on:
+    repo: ghais/HQu
+    branch: main
+  username: ghais
+  password:
+    secure: u0wxpvCQlL/oXSJqWYaPMq/DZyfJBdZMC0AEUUhYqxEARA+wyw2AQBP3fMkSBhYmXXVHPx968x9l7Z2V79epHFu3R1QMiHK0YXil5IGjUBhix+LSu8IJKe5sX5NL8vLSMmnj/5qqUnA8o6MSx761VjVDuSN/x6nZdUoOCVx78W5ysZ1B1PSaQYHlhfZjDV+uMR0jcpr1+pDJUvfH0rAluvoeM0yj6ElKSfHLXEODvWH98QmRAT3wBbSTn1UqahFsOq8gb+RJIgpm6aXZPh2sRNISgQjHdHCpmHOmq1W68LE3Io9uF5Y1nhMHfyZEXUDoz57bOHm85uibSjZIJqVEzDrUzHABY4UkfqvCma+oeiRXdLNw3CIgBfCYaH1fqiZRRWi2Rw7UZr7+pIqq13SBWiPuBkt9MT3noJ92momloptsyRaTMxRtB9SeMrwTO3Cl99LwpYYrqkBXkdBmNiBlMBJPCR6C1W+Q6dKbRs2cgVdgiJH2bN2s4NpQVlR9DNyktKXLZp0nT4yUPEY6JvXsvf1mslqyj+5KxEQHAL7+7HAImKU6opudI4lffizyYfqljY9svgCx07u4hAHyRtPIsBZMvdEIPWHCJA2H5LJV6RpTNMmH+byfBxFYQwwL8l8BS9uHZaesQyo4UHiULYzZpdXuzVYym5eG7XI5G2AJUWI=
