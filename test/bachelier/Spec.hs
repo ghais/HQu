@@ -1,11 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Test.Hspec hiding (shouldBe)
 import Q.Options.Bachelier
 import Q.Types
-import Test.Hspec.Expectations
+import Q.Options
 import           Control.Monad (unless)
-import Q.SortedVector
+
 closeTo x y =  compareWith (\x y -> (abs $ (x - y)) <= 1e-7) errorMessage x y where
   errorMessage = "Is not close to"
   compareWith :: (HasCallStack, Show a) => (a -> a -> Bool) -> String -> a -> a -> Expectation
@@ -40,8 +39,8 @@ main = hspec $ do
           context "1Y 'Call' option atm strike ($100)" $ do
             let k = Strike 100
                 t = YearFrac 1
-                b = Bachelier f r vol
-                v = eucall b t k
+                b = Bachelier t f r vol
+                v = eucall b k
             let expected = Valuation
                            (Premium 7.9788456)
                            (Delta 0.5)
@@ -51,8 +50,8 @@ main = hspec $ do
           context "1Y 'Put' option atm strike ($100)" $ do
             let k = Strike 100
                 t = YearFrac 1
-                b = Bachelier f r vol
-                v = euput b t k
+                b = Bachelier t f r vol
+                v = euput b k
             let expected = Valuation
                            (Premium 7.9788456)
                            (Delta 0.5)

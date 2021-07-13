@@ -5,7 +5,7 @@ module Q.ContingentClaim where
 
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
-import Q.Types
+
 import Data.Time
 import qualified Data.Map as M
 

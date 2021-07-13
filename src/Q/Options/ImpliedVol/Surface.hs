@@ -15,19 +15,16 @@ module Q.Options.ImpliedVol.Surface
 where
 
 import qualified Data.Map                                 as M
-import qualified Data.Map.Strict                          as M
+
 import           Data.Maybe                               (fromJust)
-import           Numeric.LinearAlgebra                    hiding (maxElement,
-                                                           minElement)
 import qualified Q.Options.Bachelier                      as Bacherlier
 import qualified Q.Options.Black76                        as B76
 import           Q.Options.ImpliedVol
-import           Q.Options.ImpliedVol.InterpolatingSmile
-import           Q.Options.ImpliedVol.StrikeInterpolation
 import           Q.Options.ImpliedVol.TimeInterpolation
 import           Q.Options.ImpliedVol.TimeSlice
 import           Q.SortedVector
 import           Q.Types
+import Q.Options (vPremium)
 
 -- | Implied volatility surface where the strikes are in the space of 'k' and
 -- implied volatility time slice is 'v'.
@@ -177,8 +174,8 @@ timeInterpolate LinearInTotalVar surface@Surface{..} k t =
 
 euOption Normal k f (DF df) (YearFrac t) vol =
   let r = Rate $ -(log df) / t
-      bacherlier = Bacherlier.Bachelier (Forward f) r vol
-  in Bacherlier.eucall bacherlier (YearFrac t) k
+      bacherlier = Bacherlier.Bachelier (YearFrac t) (Forward f) r vol
+  in Bacherlier.eucall bacherlier k
 
 euOption _ k f df t vol =
   let b76 = B76.Black76 (Forward f) df t vol

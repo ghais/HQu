@@ -1,13 +1,15 @@
-{-# LANGUAGE RecordWildCards #-}
 module Q.Options.ImpliedVol.Normal where
-import           Data.Default.Class
-import           Numeric.IEEE                   (epsilon, maxFinite, minNormal)
-import           Numeric.Natural
-import           Numeric.RootFinding
-import           Q.Options.Bachelier
-import           Q.Types
-import           Statistics.Distribution        (cumulative, density)
+import           Data.Default.Class (Default (..))
+import           Numeric.IEEE (epsilon)
+import           Numeric.Natural (Natural)
+import           Numeric.RootFinding as R (RiddersParam (RiddersParam),
+                                           Root (NotBracketed, Root, SearchFailed), Tolerance,
+                                           ridders)
+import           Q.Options.Bachelier (Bachelier (Bachelier), euOption)
+
+import           Statistics.Distribution (cumulative, density)
 import           Statistics.Distribution.Normal (standard)
+import Q.Options
 
 
 -- | Method to use to calculate the normal implied vol.
@@ -15,19 +17,19 @@ data Method =
     Jackel        -- ^ Jackel analytical formula approximation.
   | ChoKimKwak    -- ^ J. Choi, K kim, and M. Kwak (2009)
   -- | Numerical root finding. Currently Ridders is used.
-  | RootFinding {
-        maxIter ::  Natural                 -- ^ Maximum number of iterations.
-      , tol     ::  Tolerance               -- ^ Tolerance (relative or absolute)
-      , bracket :: (Double, Double, Double) -- ^ Triple of @(low bound, initial
-                                            --   guess, upper bound)@. If initial
-                                            --   guess if out of bracket middle
-                                            --   of bracket is taken as.
-        }
+  | RootFinding
+        Natural                  -- ^ Maximum number of iterations.
+        R.Tolerance              -- ^ Tolerance (relative or absolute)
+        (Double, Double, Double) -- ^ Triple of @(low bound, initial
+                                 --   guess, upper bound)@. If initial
+                                 --   guess if out of bracket middle
+                                 --   of bracket is taken as.
 
 instance Default Method where
   def = Jackel
 
 -- | Default method implementation of 'euImpliedVolWith' using 'Jackel'.
+euImpliedVol :: OptionType -> Forward -> Strike -> YearFrac -> Rate -> Premium -> Vol
 euImpliedVol = euImpliedVolWith def
 
 -- | Calcualte the bachelier option implied vol of a european option.
@@ -39,6 +41,7 @@ euImpliedVolWith m cp f k t r p
   | otherwise                = Vol $ 0
   where df = discountFactor t r
 
+euImpliedVolWith' :: Method-> OptionType-> Forward-> Strike-> YearFrac-> Rate-> Premium-> Vol
 euImpliedVolWith' Jackel cp (Forward f) (Strike k) (YearFrac t) (Rate r) (Premium p)
   -- Case where interest rate is not 0 we need undiscount. The paper is written
   -- for the undiscounted Bachelier option prices.
@@ -91,17 +94,20 @@ euImpliedVolWith' ChoKimKwak cp (Forward f) (Strike k) (YearFrac t) (Rate r) (Pr
   in Vol $ sqrt (pi / (2 * t)) * straddlePremium * heta
 
 
-euImpliedVolWith' RootFinding{..}  cp (Forward forward) k t r (Premium p) =
+euImpliedVolWith' (RootFinding maxIter tol bracket)  cp (Forward forward) k t r (Premium p) =
   let f vol        = p' - p  where
-        (Premium p') = vPremium $ euOption b t cp k
-        b            = Bachelier (Forward forward) r (Vol vol)
+        (Premium p') = vPremium $ euOption b cp k
+        b            = Bachelier t (Forward forward) r (Vol vol)
       (lb, _, ub) = bracket
       root = ridders (RiddersParam (fromEnum maxIter) tol) (lb, ub) f
   in case root of (Root vol)   -> Vol vol
                   NotBracketed -> error "not bracketed"
                   SearchFailed -> error "search failed"
 
+sqrtEpsilon :: Double
 sqrtEpsilon = sqrt epsilon
+
+h :: Floating p => p -> p
 h eta = sqrt(eta) * (num / den) where
   a0          = 3.994961687345134e-1
   a1          = 2.100960795068497e+1

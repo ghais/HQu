@@ -10,16 +10,16 @@
 module Q.MonteCarlo where
 import           Control.Monad.State
 import           Data.RVar
-import           Q.Stochastic.Discretize
+
 import           Q.Stochastic.Process
-import           Control.Monad
+
 import           Q.ContingentClaim
-import Data.Random
-import Q.Time
+
+
 import Data.Time
-import Statistics.Distribution (cumulative)
-import Statistics.Distribution.Normal (standard)
-import Q.ContingentClaim.Options
+
+
+
 import Q.Types
 
 type Path b = [(Time, b)]

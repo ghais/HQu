@@ -5,12 +5,10 @@
 {-# LANGUAGE TupleSections         #-}
 module Q.Stochastic.Process
         where
-import           Control.Monad
-import           Control.Monad.State
-import           Data.List             (foldl')
-import           Data.RVar
-import           Data.Random
-import           Numeric.LinearAlgebra
+import Control.Monad
+import Control.Monad.State
+import Data.RVar
+import Data.Random
 
 rwalkState :: RVarT (State Double) Double
 rwalkState = do
@@ -65,7 +63,7 @@ class (Num b) => StochasticProcess a b where
       if t' >= t then return b' else pEvolve p disc s' t dw
 
   -- |Similar to evolve, but evolves the process with the discretization scheme \(dt\).
-  pEvolve' :: (Discretize d b, Num b) => a -> d -> (Time, b) -> RVar b -> RVar (Time, b)
+  pEvolve' :: (Discretize d b) => a -> d -> (Time, b) -> RVar b -> RVar (Time, b)
   pEvolve' process discr s@(t, b) dw = do
     let !newT = t + dDt process discr s
         !newX = do
@@ -81,7 +79,7 @@ class (Num b) => StochasticProcess a b where
 data GeometricBrownian = GeometricBrownian {
     gbDrift :: Double -- ^Drift
   , gbDiff  :: Double -- ^Vol
-} deriving (Show)
+} deriving stock (Show)
 
 
 instance StochasticProcess GeometricBrownian Double where

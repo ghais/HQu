@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Q.Interpolation where
 import qualified Q.SortedVector as SV
-import Numeric.GSL.Interpolation
+
 import qualified Numeric.LinearAlgebra as V (Vector, fromList)
 import Foreign (Storable)
 import Data.List

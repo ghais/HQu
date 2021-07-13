@@ -7,15 +7,14 @@ module Q.Time
         , parseLocalTime
         ) where
 
-import qualified Data.ByteString          as B
+
 import           Data.ByteString.Char8    (unpack)
-import           Data.Csv                 (FromField (..), ToField (..), record,
-                                           toField, (.!), (.:))
+import           Data.Csv                 (FromField(..), ToField , toField)
 import           Data.Maybe               (fromJust)
 import           Data.Time
-import           Data.Time.Format
+
 import           Data.Time.Format.ISO8601
-import           Data.Vector              (Vector, toList)
+
 import           Q.Time.Date
 import           Q.Time.DayCounter
 
@@ -43,7 +42,7 @@ dayFormat' = calendarFormat BasicFormat
 
 -- | Format a date as an basic ISO08601 format.
 dateToString :: LocalTime -> String
-dateToString date = formatShow localTimeFormat' date
+dateToString = formatShow localTimeFormat'
 
 
 instance ToField Day where

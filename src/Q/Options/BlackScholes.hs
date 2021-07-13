@@ -7,22 +7,21 @@ module Q.Options.BlackScholes (
   , euOption
   , eucall
   , euput
-  , module Q.Options
 ) where
 
 import           Control.Monad.State
 import           Data.Random                    hiding (Gamma)
-import           Data.Time
-import           Numeric.RootFinding
-import           Q.ContingentClaim.Options
+
+
+
 import           Q.MonteCarlo
 import           Q.Options
-import           Q.Stochastic.Discretize
-import           Q.Stochastic.Process
+
+
 import           Q.Time
 import           Q.Types
-import           Statistics.Distribution        (cumulative, density)
-import           Statistics.Distribution.Normal (standard)
+
+
 import qualified Q.Options.Black76 as B76
 
 dcf = dcYearFraction ThirtyUSA

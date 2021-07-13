@@ -1,12 +1,11 @@
-
 module Q.Options (
     Valuation(..)
   , intrinsinc
   , hasTimeValue
   , module Q.Types) where
 
-import           Numeric.IEEE
-import           Q.Types
+import Numeric.IEEE
+import Q.Types
 
 
 data Valuation = Valuation {
@@ -14,7 +13,7 @@ data Valuation = Valuation {
   , vDelta   :: Delta
   , vVega    :: Vega
   , vGamma   :: Gamma
-} deriving (Show)
+} deriving stock (Show)
 
 
 -- | intrinsinc value of an option.

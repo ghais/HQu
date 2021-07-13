@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
@@ -18,6 +18,12 @@ module Q.Types (
   , Obs4(..)
   , Obs5(..)
   , Strike(..)
+  , LogRelStrike(..)
+  , AbsRelStrike(..)
+  , MoneynessForwardStrike(..)
+  , LogMoneynessForwardStrike(..)
+  , MoneynessSpotStrike(..)
+  , LogMoneynessSpotStrike(..)
   , Forward(..)
   , Premium(..)
   , Delta(..)
@@ -30,6 +36,7 @@ module Q.Types (
   , Vol(..)
   , TotalVar(..)
   , TimeScaleable(..)
+  , Tolerance(..)
   , cpi
   , discountFactor
   , discount
@@ -40,17 +47,16 @@ module Q.Types (
   , ($*$)
   , ($/$)
   , ($+$)
+  , ($-$)
   ) where
 
 import qualified Data.ByteString as B
-import           Data.Csv        (FromField (..), ToField (..))
-import           Data.Time
-import           GHC.Generics    (Generic)
-import           Q.Time
-import           Q.Time.Date
-import Foreign (Storable)
-import Numeric.LinearAlgebra (Element(..))
 import Data.Coerce
+import Data.Csv (FromField (..), ToField (..))
+import Data.Time
+import Foreign (Storable)
+import GHC.Generics (Generic)
+import Q.Time ()
 -- | Type for Put or Calls
 data OptionType  = Put | Call deriving (Generic, Eq, Show, Read, Bounded)
 instance Enum OptionType where
@@ -66,11 +72,39 @@ instance Enum OptionType where
 cpi Call = 1
 cpi Put  = -1
 
-newtype Cash     = Cash    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable) 
+
+newtype Cash     = Cash    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
 newtype Spot     = Spot    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 newtype Forward  = Forward Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 newtype Strike   = Strike  Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype AbsRelStrike = AbsRel Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype LogRelStrike = LogRel Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype MoneynessForwardStrike = MoneynessForward Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype LogMoneynessForwardStrike = LogMoneynessForward Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype MoneynessSpotStrike = MoneynessSpot Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype LogMoneynessSpotStrike = LogMoneynessSpot Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+
+newtype Tolerance = Tolerance    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
 ($*$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
 x1 $*$ x2 = coerce $ (coerce x1::Double) * (coerce x2::Double)
@@ -81,7 +115,8 @@ x1 $/$ x2 = coerce $ (coerce x1::Double) / (coerce x2::Double)
 ($+$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
 x1 $+$ x2 = coerce $ (coerce x1::Double) + (coerce x2::Double)
 
-
+($-$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
+x1 $-$ x2 = coerce $ (coerce x1::Double) - (coerce x2::Double)
 
 -- Later on i should add roll.
 newtype Expiry   = Expiry   Day    deriving (Generic, Eq, Show, Read, Ord)
@@ -179,7 +214,7 @@ class TimeScaleable a where
 
 instance TimeScaleable Double where
   scale (YearFrac t) y = y * t
-  
+
 instance TimeScaleable Rate where
   scale (YearFrac t) (Rate r)  = Rate $ r * t
 instance TimeScaleable Vol where
