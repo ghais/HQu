@@ -56,7 +56,7 @@ type CCBuilder w r a =  WriterT w (Reader r) a
 monitor :: LocalTime -> CCBuilder (ContingentClaim a) (M.Map LocalTime a) a
 monitor t = do
   tell $ ContingentClaim [CCProcessor t []] -- This step maintains the monitoring times.
-  m <- ask                                   -- This step gets the market data
+  m <- ask                                  -- This step gets the market data
   return $ m M.! t                          -- This step evaluate the market data at time t.
 
 -- | Pay an amount at a given time

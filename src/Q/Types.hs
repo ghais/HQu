@@ -1,10 +1,14 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE StandaloneKindSignatures   #-}
 
 module Q.Types (
-    Observables1(..)
+    ISIN
+  , CUSIP
+  , Observables1(..)
   , Observables2(..)
   , Observables3(..)
   , Observables4(..)
@@ -37,6 +41,7 @@ module Q.Types (
   , TotalVar(..)
   , TimeScaleable(..)
   , Tolerance(..)
+  , Derivative(..)
   , cpi
   , discountFactor
   , discount
@@ -51,12 +56,13 @@ module Q.Types (
   ) where
 
 import qualified Data.ByteString as B
-import Data.Coerce
-import Data.Csv (FromField (..), ToField (..))
-import Data.Time
-import Foreign (Storable)
-import GHC.Generics (Generic)
-import Q.Time ()
+import           Data.Coerce
+import           Data.Csv (FromField (..), ToField (..))
+import           Data.Kind
+import           Data.Time
+import           Foreign (Storable)
+import           GHC.Generics (Generic)
+import           Q.Time ()
 -- | Type for Put or Calls
 data OptionType  = Put | Call deriving (Generic, Eq, Show, Read, Bounded)
 instance Enum OptionType where
@@ -71,6 +77,9 @@ instance Enum OptionType where
 
 cpi Call = 1
 cpi Put  = -1
+
+newtype ISIN = ISIN String deriving stock (Generic, Eq, Show, Read, Ord)
+newtype CUSIP = CUSIP String deriving stock (Generic, Eq, Show, Read, Ord)
 
 
 newtype Cash     = Cash    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
@@ -104,7 +113,27 @@ newtype LogMoneynessSpotStrike = LogMoneynessSpot Double
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
 
-newtype Tolerance = Tolerance    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Tolerance = Tolerance    Double
+  deriving stock (Generic, Eq, Show, Read, Ord)
+  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+type Derivative :: Type -> Type -> Type
+newtype Derivative x y where
+  Derivative :: Double -> Derivative x y
+
+deriving stock instance Show (Derivative x y)
+deriving stock instance Eq (Derivative x y)
+deriving stock instance Generic (Derivative x y)
+deriving stock instance Ord (Derivative x y)
+deriving newtype instance Num (Derivative x y)
+deriving newtype instance Fractional (Derivative x y)
+deriving newtype instance Real (Derivative x y)
+deriving newtype instance RealFrac (Derivative x y)
+deriving newtype instance RealFloat (Derivative x y)
+deriving newtype instance Floating (Derivative x y)
+deriving newtype instance Storable (Derivative x y)
+
+
 
 ($*$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
 x1 $*$ x2 = coerce $ (coerce x1::Double) * (coerce x2::Double)
@@ -131,6 +160,7 @@ newtype YearFrac = YearFrac {unYearFrac:: Double} deriving (Generic, Eq, Show, R
 newtype Rate     = Rate Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 newtype DF       = DF   Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
+discountFactor :: YearFrac -> Rate -> DF
 discountFactor (YearFrac t) (Rate r) = DF $ exp ((-r) * t)
 discount (DF df) p = p * df
 undiscount (DF df) p = p / df

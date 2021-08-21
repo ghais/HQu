@@ -9,17 +9,17 @@ import           Q.Currency
 -- | Canadian dollar
 cad :: Currency
 cad = Currency {
-    cName           = "Canadian dollar"
-  , cCode           = "CAD"
-  , cIsoCode        = 124
-  , cFracsPerUnit   = 100
+    _name           = "Canadian dollar"
+  , _code           = "CAD"
+  , _isoCode        = 124
+  , _fracsPerUnit   = 100
 }
 
 -- | U.S. dollar
 usd :: Currency
 usd = Currency {
-    cName           = "U.S. dollar"
-  , cCode           = "USD"
-  , cIsoCode        = 840
-  , cFracsPerUnit   = 100
+    _name           = "U.S. dollar"
+  , _code           = "USD"
+  , _isoCode        = 840
+  , _fracsPerUnit   = 100
 }

@@ -1,6 +1,6 @@
 module Q.Options (
     Valuation(..)
-  , intrinsinc
+  , intrinsic
   , hasTimeValue
   , module Q.Types) where
 
@@ -17,9 +17,9 @@ data Valuation = Valuation {
 
 
 -- | intrinsinc value of an option.
-intrinsinc :: OptionType -> Forward -> Strike -> DF -> Double
-intrinsinc Call (Forward f) (Strike k) (DF df) = max (f - k) 0
-intrinsinc Put  (Forward f) (Strike k) (DF df) = max (k - f) 0
+intrinsic :: OptionType -> Forward -> Strike -> Double
+intrinsic Call (Forward f) (Strike k) = max (f - k) 0
+intrinsic Put  (Forward f) (Strike k) = max (k - f) 0
 
 -- | returns True if the undiscounted option premium is greater than the 'intrinsinc'
 hasTimeValue ::
@@ -29,6 +29,6 @@ hasTimeValue ::
   -> Premium
   -> DF
   -> Bool
-hasTimeValue cp f k p df =  df `undiscount` p' - (intrinsinc cp f k df) > epsilon
+hasTimeValue cp f k p df =  df `undiscount` p' - (intrinsic cp f k) > epsilon
     where (Premium p') = p
 

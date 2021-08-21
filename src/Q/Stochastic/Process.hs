@@ -27,8 +27,8 @@ instance (Num a) => Num (RVarT m a) where
   (+) = liftM2 (+)
   (-) = liftM2 (-)
   (*) = liftM2 (*)
-  abs = liftM abs
-  signum = liftM signum
+  abs = fmap abs
+  signum = fmap signum
   fromInteger x = return $ fromInteger x
 
 

@@ -7,6 +7,8 @@ module Q.Options.Black76
   , euput
   , dPlus
   , dMinus
+  , B76Error
+  , B76Monad
   )
   where
 
@@ -20,6 +22,7 @@ import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..))
 import           Statistics.Distribution (cumulative, density)
 import           Statistics.Distribution.Normal (standard)
 import Q.Types (LogRelStrike)
+import Control.Monad.Except
 
 
 data Black76 = Black76 {
@@ -28,6 +31,14 @@ data Black76 = Black76 {
   , b76T   :: YearFrac
   , b76Vol :: Vol
 }
+
+data B76Error = NegativeVol Vol
+              | InvalidParameter String
+              | NoSolution String
+              | NoImpliedVol String
+              deriving stock (Show, Eq)
+
+type B76Monad = Except B76Error
 
 -- | At the money forward strike.
 atmf :: Black76 -> Strike

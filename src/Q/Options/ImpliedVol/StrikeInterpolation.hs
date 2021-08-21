@@ -1,34 +1,33 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Q.Options.ImpliedVol.StrikeInterpolation where
 
-import           Data.Coerce
-import qualified Numeric.GSL.Interpolation as GSL
-import           Q.Interpolation
-import           Q.SortedVector
+import qualified Q.Interpolation as Interpolation
 import           Q.Types
+import qualified Data.SortedList as SortedList
 
-data StrikeInterpolation = Linear
-                         | CubicNatural
-                         | CubicAkima
-                         | CubicMonotone
-
-data StrikeExtrapolation = Constant
+data InterpolationMethod = Linear | Cubic | Akima
+data ExtrapolationMethod = Constant
                          | ConstantGradient
                          | ConstantCurvature
 
-instance InterpolatorV StrikeInterpolation Strike Vol where
-  interpolateV Linear        (SortedVector strikes) vols (Strike k) =
-    Vol $ GSL.evaluateV GSL.Linear (coerce strikes) (coerce vols) k
-
-  interpolateV CubicNatural  (SortedVector strikes) vols (Strike k) =
-    Vol $ GSL.evaluateV GSL.CSpline  (coerce strikes) (coerce vols) k
-
-  interpolateV CubicAkima    (SortedVector strikes) vols (Strike k) =
-    Vol $ GSL.evaluateV GSL.Akima  (coerce strikes) (coerce vols) k
+data StrikeInterpolation = StrikeInterpolation InterpolationMethod ExtrapolationMethod (SortedList.SortedList (Strike, Vol))
 
 
-  interpolateV CubicMonotone (SortedVector strikes) vols (Strike k) =
-    -- The interpolation method should be Steffen but until the next
-    -- version of hmatrix-gsl is release i am using Akima.
-    Vol $ GSL.evaluateV GSL.Akima (coerce strikes) (coerce vols) k 
+mkInterpolator :: StrikeInterpolation -> Interpolation.Interpolation Strike Vol
+mkInterpolator (StrikeInterpolation Linear _ kvs) = Interpolation.linearInterpolator strikes vols
+  where (strikes ,vols) = (unzip . SortedList.fromSortedList) kvs
+mkInterpolator (StrikeInterpolation Cubic _ kvs) = Interpolation.cubicSplineInterpolator strikes vols
+  where (strikes ,vols) = (unzip . SortedList.fromSortedList) kvs
+mkInterpolator (StrikeInterpolation Akima _ kvs) = Interpolation.akimaSplineInterpolator strikes vols
+  where (strikes ,vols) = (unzip . SortedList.fromSortedList) kvs
 
+
+
+instance Interpolation.Interpolator StrikeInterpolation Strike Vol where
+  interpolate method  = Interpolation.interpolate ( mkInterpolator method)
+  derivative method  = Interpolation.derivative (mkInterpolator method)
+  secondDerivative method = Interpolation.secondDerivative (mkInterpolator method)
+  xMin method  = Interpolation.xMin (mkInterpolator method)
+  xMax method = Interpolation.xMax (mkInterpolator method)
+
+
+  

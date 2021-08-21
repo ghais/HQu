@@ -6,6 +6,10 @@ module Q.Options.ImpliedVol.LetsBeRational (
 import           Data.Coerce (coerce)
 import           Foreign.C.Types
 import           Q.Types
+import Q.Options.Black76 (B76Monad)
+
+
+
 
 
 foreign import ccall
@@ -13,6 +17,6 @@ foreign import ccall
      CDouble -> CDouble  -> CDouble -> CDouble  -> CDouble  -> CDouble
 
 -- | Calculate implied volatility for a European option using Let's Be Rational.
-euImpliedVol :: OptionType -> Forward -> Strike -> YearFrac -> Rate -> Premium -> Vol
+euImpliedVol :: OptionType -> Forward -> Strike -> YearFrac -> Rate -> Premium -> B76Monad Vol
 euImpliedVol cp (Forward f) (Strike k) (YearFrac t) (Rate r) (Premium p) =
-  coerce $ c_lbr (CDouble p) (CDouble f) (CDouble k) (CDouble t) (CDouble (cpi cp))
+  return $ coerce $ c_lbr (CDouble p) (CDouble f) (CDouble k) (CDouble t) (CDouble (cpi cp))

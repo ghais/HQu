@@ -1,7 +1,12 @@
-module Q.Options.ImpliedVol.Normal where
+module Q.Options.ImpliedVol.Normal
+  (
+    Method(..)
+  , euImpliedVol
+  , euImpliedVolWith
+  )
+where
 import           Data.Default.Class (Default (..))
 import           Numeric.IEEE (epsilon)
-import           Numeric.Natural (Natural)
 import           Numeric.RootFinding as R (RiddersParam (RiddersParam),
                                            Root (NotBracketed, Root, SearchFailed), Tolerance,
                                            ridders)
@@ -18,7 +23,7 @@ data Method =
   | ChoKimKwak    -- ^ J. Choi, K kim, and M. Kwak (2009)
   -- | Numerical root finding. Currently Ridders is used.
   | RootFinding
-        Natural                  -- ^ Maximum number of iterations.
+        Int                      -- ^ Maximum number of iterations.
         R.Tolerance              -- ^ Tolerance (relative or absolute)
         (Double, Double, Double) -- ^ Triple of @(low bound, initial
                                  --   guess, upper bound)@. If initial

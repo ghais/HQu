@@ -2,19 +2,22 @@ module Q.Options.Pricing.Curran where
 import           Control.Monad.Except
 import           Q.Options (vPremium)
 import           Q.Options.Black76
-import qualified Q.SortedVector as SV
+import Numeric.RootFinding
 import           Q.Types
-import GHC.Base (coerce)
-import qualified Numeric.GSL.Root as Root
+import           Statistics.Distribution (cumulative)
+import           Statistics.Distribution.Normal (standard)
+
 
 
 data CurranError = NegativeVol Vol
-                 | InvalidParameters String deriving stock (Show, Eq)
+                 | InvalidParameters String
+                 | NoSolution String
+                 | NoImpliedVol String deriving stock (Show, Eq)
 
-type CurranMonad = Either CurranError
+type CurranMonad = Except CurranError
 
-asianOption :: Black76  -> SV.SortedVector YearFrac -> Int -> Double -> OptionType -> Strike -> CurranMonad Premium
-asianOption b76@Black76{..} monitoringTimes nFixed sFixed cp (Strike k) = do
+asianOption :: Black76  -> YearFrac -> Int -> Int -> Double -> OptionType -> Strike -> CurranMonad Premium
+asianOption b76@Black76{..} firstMonitor nMonitor nFixed sFixed cp (Strike k) = do
   checkPreconditions
   if isPastExpiry then
     return 0.0
@@ -27,17 +30,17 @@ asianOption b76@Black76{..} monitoringTimes nFixed sFixed cp (Strike k) = do
   else if isLastFixing then
     handleLastFixing
   else
-    handleNormalCase b76 monitoringTimes nFixed sFixed cp (Strike k)
+    handleNormalCase b76 firstMonitor nMonitoringTimes nFixingsSoFar sFixed cp (Strike kEffective)
   where checkPreconditions = do
-           when (SV.null monitoringTimes) $
+           when (nMonitor <= 0) $
              throwError (InvalidParameters "No monitoring times specified")
-           when (SV.head monitoringTimes > b76T) $
+           when (firstMonitor > b76T) $
              throwError (InvalidParameters "Time to first monitoring point cannot be after the B76 tenor")
            when (nFixed < 0) $
              throwError (InvalidParameters "Num fixed points cannot be negative")
            when (sFixed > 0 && nFixed == 0) $
              throwError (InvalidParameters "No points are fixed so running sum cannot be greater than 0")
-           when (b76T == 0 && nFixed /=  SV.length monitoringTimes) $
+           when (b76T == 0 && nFixed /=  nMonitor) $
               throwError (InvalidParameters "All points shuold be fixed")
 
         isPastExpiry = b76T < 0
@@ -53,67 +56,63 @@ asianOption b76@Black76{..} monitoringTimes nFixed sFixed cp (Strike k) = do
         handleDefinitlyITM = let finalAvg = (sFixed + nRemainingFixings * f0) / nMonitoringTimes
                              in return $ Premium $ discount b76DF (max 0 (cpi cp * (finalAvg - k)))
 
-        isLastFixing = SV.length monitoringTimes - nFixed == 1
+        isLastFixing = nMonitor - nFixed == 1
         handleLastFixing = let kHat = Strike $ nMonitoringTimes * k - sFixed
                            in return $ vPremium $ euOption b76 cp kHat
 
-        nRemainingFixings = fromIntegral (SV.length monitoringTimes - nFixed)
-        nMonitoringTimes = fromIntegral $ SV.length monitoringTimes
+        nRemainingFixings = fromIntegral (nMonitor - nFixed)
+        nMonitoringTimes = fromIntegral nMonitor
         nFixingsSoFar    = fromIntegral nFixed
         (Forward f0) = b76F
+        kEffective = if 0 < nRemainingFixings then
+                        (k * nMonitoringTimes - sFixed) / nRemainingFixings
+                     else k
 
 
-handleNormalCase :: Black76  -> SV.SortedVector YearFrac -> Int -> Double -> OptionType -> Strike -> CurranMonad Premium
-handleNormalCase b76@Black76{..} monitoringTimes nFixed sFixed cp (Strike k) = do
-  let nRemainingFixings = fromIntegral $ SV.length monitoringTimes - nFixed
-      nMonitoringTimes = fromIntegral $ SV.length monitoringTimes
-      kEffective = if 0 < nRemainingFixings then (k * nMonitoringTimes - sFixed) / nRemainingFixings else k
+handleNormalCase :: Black76  -> YearFrac -> Double -> Double -> Double -> OptionType -> Strike -> CurranMonad Premium
+handleNormalCase b76@Black76{..} (YearFrac firstMonitor) n m sFixed cp (Strike k) = do
+  let t1                = (ttm - firstMonitor) / (n - 1) * m  + firstMonitor
+      p                 = n - m
+      z                 = cpi cp
+      (Vol v)           = b76Vol
+      (Forward s)       = b76F
+      dt                = if (n - m - 1) == 0 then ttm else (ttm - t1) / (n - m - 1)
       largeVolThreshold = 100
-      (Forward f0) = b76F
+      (Forward f0)      = b76F
+      (YearFrac ttm)    = b76T
+      mu                = ((-0.5) * v * v ) * (t1 + ttm) * 0.5
+      tx                = t1 + dt * ((n - m) - 1) * (2 * (n - m) - 1) / (6 * (n - m));
+      vx = v * sqrt(t1 + dt * (p - 1) * (2 * p - 1) / (6 * p))
+      my = log(s) + (-v * v * 0.5) * (t1 + (p - 1) * dt / 2);
+
+      arg sHat i        = let ti  = t1 + (i - 1) * dt
+                              mui = (-0.5 * v * v) * ti;
+                              txi = t1 + dt * (i - 1) * (1 - i / (2 * (n - m)))
+                          in (txi, mui + (log(sHat / s) - mu) * txi / tx + 0.5 * v * v * (ti - txi * txi / tx))
+      f  0   = (-k)
+      f sHat = let argis =  map (arg sHat) [1.0..(n - m)]
+                   sum1  = foldr (\(_, argi) sum0 -> sum0 + exp argi) 0 argis
+               in if isInfinite sum1 then
+                    -1
+                  else s * sum1 / (n - m) - k
+      f' 0 = 0
+      f' sHat = let argis = map (arg sHat) [1.0..(n - m)]
+                    sum1  = foldr (\(txi, argi) sum0 -> sum0 + (exp argi) * txi / tx) 0 argis
+                in (s / sHat) * sum1 / (n - m);
   if largeVolThreshold < b76Vol then
-    return $ Premium $ discount b76DF (if cp == Call then f0 else kEffective)
+    return $ Premium $ discount b76DF (if cp == Call then f0 else k)
   else
-    let params = foldl updateParams  (curranParams b76 nRemainingFixings) (drop nFixed (SV.toList monitoringTimes))
-        updateParams params@Params{..} (YearFrac tt_j) =
-           params {
-                    timeSum = YearFrac timeSum'
-                  , weightedTimeSum = weightedTimeSum'
-                  , gammaI = (YearFrac tt_j, gamma) : gammaI
-                  , j = j + 1
-                  }
-           where weightedTimeSum'    = weightedTimeSum + j * tt_j
-                 (YearFrac timeSum') = timeSum + YearFrac tt_j
-                 gamma = sigmaSquaredNorm * (timeSum' + (nRemainingFixings - j) * tt_j)
-        muG = log f0 - 0.5 * sigmaSquaredNorm params * coerce (timeSum params)
-        sigma2G = sigmaSquaredNorm params / nRemainingFixings * ((2 * nRemainingFixings + 1) * coerce (timeSum params) - 2 * weightedTimeSum params)
-        sigmaG = sqrt sigma2G
-    in  undefined
+    let r =  newtonRaphson (NewtonParam 100 (AbsTol 1e-6)) (0.0001 * k * k, 0, k) (\x -> (f x, f' x))
+    in case r of
+      Root lb -> if lb < 0 then
+                   return $ Premium $ discount b76DF (if cp == Call then f0 else k)
+                 else
+                   let arg2 i    =  exp(myi + 0.5 * vi_2) * cumulative standard (z * ((my - log lb + vxi) / vx)) where
+                         ti   = dt * i + t1 - dt;
+                         vi_2 = v * v * (t1 + (i - 1) * dt);
+                         vxi = v * v * (t1 + dt * ((i - 1) - i * (i - 1) / (2 * p)))
+                         myi = log(s) + (-v * v * 0.5) * ti
+                       sum1 = sum (map arg2 [1..p])
+        in return $ Premium $ discount b76DF $ max 0 (z * p / n * (1/ p * sum1 - k * (cumulative standard (z * (my - log lb)/vx))))
+      _ -> throwError $ NoSolution "for lower bound"
 
-data Params = Params
-  {
-    gammaI :: ![(YearFrac, Double)]
-  , timeSum :: !YearFrac
-  , weightedTimeSum :: !Double
-  , sigmaSquaredNorm :: !Double
-  , j :: Double
-  }
-
-curranParams :: Black76 -> Double -> Params
-curranParams (Black76 _ _ _ (Vol sigma)) nRemainingFixings = Params [] 0 0 (sigma * sigma / nRemainingFixings) 1
-
-
-
-lowerBounds :: Black76 -> Params -> Double -> Double -> Double -> Double -> Double
-lowerBounds b76@Black76{..} params@Params{..} muG sigma2G kEff nFixings =
-  let nuI = map (calcNuI b76 muG sigma2G) gammaI
-      f x = let expect = foldr (\((_, gamma_i), nu_i ) expectation  -> expectation + nu_i * (x**gamma_i/sigma2G))  0 (zip gammaI nuI)
-            in expect / nFixings - kEff
-      f' x = let deriv = foldr (\((_, gamma_i), nu_i ) derivative -> derivative + nu_i * gamma_i * (x**gamma_i/sigma2G))
-             in deriv / (x * nFixings *sigma2G)
-  in undefined
-
-calcNuI :: Black76 -> Double -> Double -> (YearFrac, Double) -> Double
-calcNuI (Black76 (Forward f) _ _  (Vol sigma)) muG sigma2G (YearFrac t, gamma) =
-  let mu = log f - 0.5 * sigma * sigma * t
-      sigma2 = sigma * sigma * t
-  in exp $ mu - muG * gamma / sigma2G + 0.5 * (sigma2 - gamma * gamma / sigma2G)

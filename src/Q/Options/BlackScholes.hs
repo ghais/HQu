@@ -24,7 +24,7 @@ import           Q.Types
 
 import qualified Q.Options.Black76 as B76
 
-dcf = dcYearFraction ThirtyUSA
+dcf = dcYearFraction Thirty360USA
 
 -- | Parameters for a simplified black scholes equation.
 data BlackScholes = BlackScholes {

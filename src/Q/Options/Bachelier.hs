@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module Q.Options.Bachelier
   (
     Bachelier(..)
@@ -8,10 +6,15 @@ module Q.Options.Bachelier
   , euput
   ) where
 
-import           Control.Monad.State
+import           Control.Monad.State (MonadState (get, put), MonadTrans (lift), StateT)
 import           Data.Random (RVar, stdNormal)
-import           Q.MonteCarlo
-import           Q.Options
+import           Numeric.GSL.Differentiation (derivCentral)
+import           Q.MonteCarlo (Model (..))
+import           Q.Options (Delta (Delta), Forward (..), Gamma (Gamma), OptionType (..),
+                            Premium (Premium), Rate (..), Strike (..), TimeScaleable (scale),
+                            Valuation (Valuation, vPremium), Vega (Vega), Vol (..),
+                            YearFrac (YearFrac), cpi, volToTotalVar)
+import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..))
 import           Statistics.Distribution (cumulative)
 import           Statistics.Distribution.Normal (standard)
 
@@ -45,11 +48,18 @@ instance Model Bachelier Bachelier where
     where dt = t2 - t1
 
   evolve _ (YearFrac t) = do
-    (YearFrac t0, (Bachelier _ (Forward f0) (Rate r) (Vol sigma))) <- get
+    (YearFrac t0, Bachelier _ (Forward f0) (Rate r) (Vol sigma)) <- get
     let dt = t - t0
     dW <- lift stdNormal::StateT (YearFrac, Bachelier) RVar Double
     let ft = f0 * exp (r * dt) + sqrt(sigma*sigma/2*r * (exp (2 * r * dt) - 1)) * dW
     put (YearFrac t, Bachelier (YearFrac t) (Forward ft) (Rate r) (Vol sigma))
     return ft
 
-  
+
+instance TimeSlice Bachelier Strike where
+  totalVar (Bachelier t _ _ vol) _ = volToTotalVar vol t
+  dW _ _ = 0
+  d2W _ _ = 0
+  impliedDensity bachelier (Strike k) = let
+    dk k' = fst (derivCentral 1e-4 (\k2 -> let (Premium v) = vPremium (eucall bachelier (Strike k2)) in v) k')
+    in fst (derivCentral 1e-4 dk k)

@@ -9,26 +9,26 @@ import           Q.Currency
 -- | Swiss france
 chf :: Currency
 chf = Currency {
-    cName           = "Swiss franc"
-  , cCode           = "CHF"
-  , cIsoCode        = 756
-  , cFracsPerUnit   = 100
+    _name           = "Swiss franc"
+  , _code           = "CHF"
+  , _isoCode        = 756
+  , _fracsPerUnit   = 100
   }
 
 -- | European Euro
 eur :: Currency
 eur = Currency {
-    cName           = "European Euro"
-  , cCode           = "EUR"
-  , cIsoCode        = 978
-  , cFracsPerUnit   = 100
+    _name           = "European Euro"
+  , _code           = "EUR"
+  , _isoCode        = 978
+  , _fracsPerUnit   = 100
   }
 
 -- | British pound sterling
 gbp :: Currency
 gbp = Currency {
-    cName           = "British pound sterling"
-  , cCode           = "GBP"
-  , cIsoCode        = 826
-  , cFracsPerUnit   = 100
+    _name           = "British pound sterling"
+  , _code           = "GBP"
+  , _isoCode        = 826
+  , _fracsPerUnit   = 100
   }

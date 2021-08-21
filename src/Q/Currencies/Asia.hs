@@ -9,8 +9,8 @@ import           Q.Currency
 -- | Syrian Pounds
 syp :: Currency
 syp = Currency {
-    cName           = "Syrian pounds"
-  , cCode           = "SYP"
-  , cIsoCode        = 4217
-  , cFracsPerUnit   = 100
+    _name           = "Syrian pounds"
+  , _code           = "SYP"
+  , _isoCode        = 4217
+  , _fracsPerUnit   = 100
 }
