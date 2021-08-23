@@ -55,13 +55,16 @@ euOption Black76{..} cp k = Valuation premium delta vega gamma where
   d2          = dMinus b76F b76Vol k b76T
   nd1         = n d1
   nd2         = n d2
+  nd1'        = n (-d1)
+  nd2'        = n (-d2)
   callDelta   = b76DF `discount` nd1
   putDelta    = b76DF `discount` (- (n (-d1)))
   vega        = Vega  $ b76DF `discount` density standard d1 * f * sigmaSqt
   gamma       = Gamma $ b76DF `discount` density standard d1 / (f * sigmaSqt)
   premium  = Premium $ case cp of
     Call -> b76DF `discount` (f * nd1 - nd2 * k')
-    Put  -> b76DF `discount` (n (-d2) * k' - n (-d1) * f)
+    -- x * Exp(-r * T) * CND(-d2) - S * Exp((- r) * T) * CND(-d1)
+    Put  -> b76DF `discount` (nd2' * k' - nd1' * f)
     where (Strike k') = k
   delta | cp == Call = Delta callDelta
         | otherwise = Delta putDelta

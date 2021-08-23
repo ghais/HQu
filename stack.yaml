@@ -1,6 +1,9 @@
-resolver: lts-18.1
+resolver: lts-18.5
 
 extra-deps:
   - conversion-1.2.1@sha256:8db4210950736e54be5cd7f7076c19e05d06fb48673eb23638093246a1e7199e,2155
-
+  - git: https://github.com/ghais/hmatrix
+    commit: f2cffb7da8deec70b707a38eb60cb2b78837a099
+    subdirs:
+      - packages/gsl
 

@@ -19,4 +19,5 @@ foreign import ccall
 -- | Calculate implied volatility for a European option using Let's Be Rational.
 euImpliedVol :: OptionType -> Forward -> Strike -> YearFrac -> Rate -> Premium -> B76Monad Vol
 euImpliedVol cp (Forward f) (Strike k) (YearFrac t) (Rate r) (Premium p) =
-  return $ coerce $ c_lbr (CDouble p) (CDouble f) (CDouble k) (CDouble t) (CDouble (cpi cp))
+  return $ coerce $ c_lbr (CDouble undiscountP) (CDouble f) (CDouble k) (CDouble t) (CDouble (cpi cp))
+  where undiscountP = undiscount  (discountFactor (coerce t) (coerce r)) p

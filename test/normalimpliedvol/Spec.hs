@@ -50,3 +50,4 @@ main = hspec $
       context "When interest rate is slightly negative (-1%)" $ do
         let r         = Rate (-0.01)
         runTests f r strikes vols t
+

@@ -24,7 +24,14 @@ source-repository head
 
 common common-options
   build-depends:       base >= 4.11.0 && < 5
-  
+                     , mtl >=2.2 && < 3
+                     , lens
+                     , direct-sqlite
+                     , raw-strings-qq
+                     , text >= 1.2
+                     , time >= 1.9
+                     , data-default-class >= 0.1 && <0.2
+                     , ieee754 >= 0.8 && <0.9
   
   ghc-options:         -Wall
                        -Wcompat
@@ -58,6 +65,7 @@ common common-options
                        TupleSections
                        TypeApplications
                        ViewPatterns
+                       TemplateHaskell
 
 library
   import:              common-options
@@ -72,6 +80,7 @@ library
                        Q.Currency
                        Q.Greeks
                        Q.Interpolation
+                       Q.IR
                        Q.MonteCarlo
                        Q.Options
                        Q.Options.Bachelier
@@ -86,6 +95,8 @@ library
                        Q.Options.ImpliedVol.Surface
                        Q.Options.ImpliedVol.SVI
                        Q.Options.ImpliedVol.TimeSlice
+                       Q.Options.ImpliedVol.Curran
+                       Q.Options.Pricing.Curran
                        Q.Payoff
                        Q.Plotting
                        Q.Stats.Arima
@@ -93,6 +104,7 @@ library
                        Q.Stochastic
                        Q.Stochastic.Discretize
                        Q.Stochastic.Process
+                       Q.TermStructures
                        Q.Time
                        Q.Time.Date
                        Q.Time.DayCounter
@@ -120,6 +132,7 @@ library
                       , containers >= 0.6.2 && <0.7
                       , conversion >= 1.2 && <2
                       , data-default-class >= 0.1 && <0.2
+                      , deepseq >= 1.4 && < 2
                       , erf >= 2 && <3
                       , hmatrix >= 0.18 && <0.30
                       , hmatrix-gsl >= 0.19 && <0.20
@@ -150,6 +163,8 @@ library
  if os(OSX)
         extra-lib-dirs: /opt/local/lib/
         include-dirs: /opt/local/include/
+        extra-lib-dirs: /usr/local/homebrew/brew/lib
+        include-dirs: /usr/local/homebrew/brew/include
         extra-lib-dirs: /usr/local/lib/
         include-dirs: /usr/local/include/
         if arch(i386)
@@ -169,8 +184,17 @@ library
        extra-lib-dirs: /usr/local/lib
        include-dirs: /usr/local/include
 
- extra-libraries: gsl
+ extra-libraries: gsl, LBR
  pkgconfig-depends: gsl
+
+executable recast
+  import:              common-options
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  build-depends:       HQu
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
 
 test-suite bachelier-test
   import:              common-options
