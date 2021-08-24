@@ -114,20 +114,9 @@ library
                        Paths_HQu
   autogen-modules:
                        Paths_HQu
-  include-dirs:
-                       external/include
-  cxx-sources:
-                       external/src/lets_be_rational.cpp
-                       external/src/normaldistribution.cpp
-                       external/src/rationalcubic.cpp
-                       external/src/erf_cody.cpp
-  install-includes:
-                       importexport.h
-                       lets_be_rational.h
-                       normaldistribution.h
-                       rationalcubic.h
   build-depends:
                         bytestring >=0.10 && <0.12
+                      , LetsBeRational >= 1.0.0
                       , cassava >=0.5
                       , containers >= 0.6.2 && <0.7
                       , conversion >= 1.2 && <2
@@ -136,7 +125,6 @@ library
                       , erf >= 2 && <3
                       , hmatrix >= 0.18 && <0.30
                       , hmatrix-gsl >= 0.19 && <0.20
-                      , hmatrix-gsl-stats >= 0.4.1
                       , hspec >= 2.7.10
                       , hspec-expectations >= 0.8.2
                       , hvega
@@ -184,17 +172,8 @@ library
        extra-lib-dirs: /usr/local/lib
        include-dirs: /usr/local/include
 
- extra-libraries: gsl, LBR
+ extra-libraries: gsl
  pkgconfig-depends: gsl
-
-executable recast
-  import:              common-options
-  hs-source-dirs:      app
-  main-is:             Main.hs
-  build-depends:       HQu
-  ghc-options:         -threaded
-                       -rtsopts
-                       -with-rtsopts=-N
 
 test-suite bachelier-test
   import:              common-options
