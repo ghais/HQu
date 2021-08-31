@@ -103,7 +103,7 @@ handleNormalCase b76@Black76{..} (YearFrac firstMonitor) n m sFixed cp (Strike k
   if largeVolThreshold < b76Vol then
     return $ Premium $ discount b76DF (if cp == Call then f0 else k)
   else
-    let r =  newtonRaphson (NewtonParam 100 (AbsTol 1e-6)) (0.0001 * k * k, 0, k) (\x -> (f x, f' x))
+    let r =  newtonRaphson (NewtonParam 100 (RelTol 1e-6)) (0.0001 * k * k, 0, k) (\x -> (f x, f' x))
     in case r of
       Root lb -> if lb < 0 then
                    return $ Premium $ discount b76DF (if cp == Call then f0 else k)
