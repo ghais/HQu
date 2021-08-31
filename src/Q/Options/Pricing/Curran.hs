@@ -52,7 +52,7 @@ asianOption b76@Black76{..} firstMonitor nMonitor nFixed sFixed cp (Strike k) = 
         handleNearZeroVol = let finalAvg = (sFixed + nRemainingFixings * f0) / nMonitoringTimes
                             in return $ Premium $ discount b76DF (max 0 (cpi cp * (finalAvg - k)))
 
-        isDefinitlyITM = nFixed > 0 && f0 >= nMonitoringTimes * k / nFixingsSoFar
+        isDefinitlyITM = nFixed > 0 && averageSoFar >= nMonitoringTimes * k / nFixingsSoFar
         handleDefinitlyITM = let finalAvg = (sFixed + nRemainingFixings * f0) / nMonitoringTimes
                              in return $ Premium $ discount b76DF (max 0 (cpi cp * (finalAvg - k)))
 
@@ -61,8 +61,9 @@ asianOption b76@Black76{..} firstMonitor nMonitor nFixed sFixed cp (Strike k) = 
                            in return $ vPremium $ euOption b76 cp kHat
 
         nRemainingFixings = fromIntegral (nMonitor - nFixed)
-        nMonitoringTimes = fromIntegral nMonitor
-        nFixingsSoFar    = fromIntegral nFixed
+        nMonitoringTimes  = fromIntegral nMonitor
+        nFixingsSoFar     = fromIntegral nFixed
+        averageSoFar      = sFixed / nFixingsSoFar    
         (Forward f0) = b76F
         kEffective = if 0 < nRemainingFixings then
                         (k * nMonitoringTimes - sFixed) / nRemainingFixings
