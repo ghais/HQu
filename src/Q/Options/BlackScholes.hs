@@ -55,7 +55,7 @@ atmf BlackScholes{..} t = Strike $ s / d where
 
 
 -- | European option valuation with black scholes.
-euOption ::  BlackScholes ->  YearFrac -> OptionType -> Strike ->Valuation
+euOption ::  BlackScholes ->  YearFrac -> OptionType -> Strike -> Valuation
 euOption bs@BlackScholes{..} t cp k =
   let b76 = B76.Black76 {
           b76F  = forward bs t

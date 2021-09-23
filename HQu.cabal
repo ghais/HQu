@@ -71,6 +71,8 @@ library
   import:              common-options
   hs-source-dirs:      src
   exposed-modules:     HQu
+                       Q.Correlation
+                       Q.Options.ImpliedVol.VolCube
                        Q.SortedVector
                        Q.ContingentClaim
                        Q.ContingentClaim.Options
@@ -105,6 +107,7 @@ library
                        Q.Stochastic.Discretize
                        Q.Stochastic.Process
                        Q.TermStructures
+                       Q.TermStructures.Yield.DiscountCurve                       
                        Q.Time
                        Q.Time.Date
                        Q.Time.DayCounter
@@ -174,6 +177,7 @@ library
 
  extra-libraries: gsl
  pkgconfig-depends: gsl
+
 
 test-suite bachelier-test
   import:              common-options

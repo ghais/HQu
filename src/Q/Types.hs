@@ -33,6 +33,8 @@ module Q.Types (
   , Delta(..)
   , Vega(..)
   , Gamma(..)
+  , Theta(..)
+  , Rho (..)
   , Expiry(..)
   , YearFrac(..)
   , Rate(..)
@@ -154,7 +156,8 @@ newtype Premium  = Premium  Double deriving (Generic, Eq, Show, Read, Ord, Num, 
 newtype Delta    = Delta    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 newtype Vega     = Vega     Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 newtype Gamma    = Gamma    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-
+newtype Theta    = Theta    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Rho      = Rho      Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 newtype YearFrac = YearFrac {unYearFrac:: Double} deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
 newtype Rate     = Rate Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)

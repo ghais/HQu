@@ -14,7 +14,7 @@ import           Graphics.Vega.VegaLite      hiding (repeat, sample)
 import Q.Options.Black76 
 import Numeric.GSL.Integration
 
-import Q.Types
+import Q.Types hiding (Rho)
 alpha = Alpha (1)
 beta = Beta 0
 rho = Rho (0)

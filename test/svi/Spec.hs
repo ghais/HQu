@@ -3,7 +3,7 @@ module Main where
 
 import Test.Hspec hiding (shouldBe)
 import Q.Options.ImpliedVol.SVI
-import Q.Types
+import Q.Types hiding (Rho)
 import Q.Options.ImpliedVol.TimeSlice (totalVar)
 import Q.Options.ImpliedVol
 import Control.Monad (unless)
