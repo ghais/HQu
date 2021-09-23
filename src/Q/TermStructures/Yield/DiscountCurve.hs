@@ -12,6 +12,7 @@ import           Q.TermStructures
 import           Q.Time (DayCounter, dcYearFraction)
 import           Q.Time.Date
 import           Q.Types
+import Data.Coerce (coerce)
 
 
 
@@ -35,7 +36,9 @@ mkDiscountCurve ::
   -> SortedList.SortedList (Day, DF)       -- ^ Discount factors. If the first discount factor is not (refDate, DF 1)
                                            -- then it will be inserted.
   -> Either String Interpolated
-mkDiscountCurve d dc cal settlementDays = undefined -- mkInterpolatedDiscountCurve d dc cal settlementDays LogLinear
+mkDiscountCurve d dc cal settlementDays discounts = mkInterpolatedDiscountCurve d dc cal settlementDays (LogInterp (linearInterpolator ts (coerce dfs))) discounts
+  where (days, dfs) = unzip $ SortedList.fromSortedList discounts
+        ts          = map (dcYearFraction dc d) days
 
 -- | Make an interpolated discount curve.
 mkInterpolatedDiscountCurve ::
