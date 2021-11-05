@@ -146,3 +146,13 @@ main = hspec $
           pv = Premium $ 3.31813
       runExcept (asianOption b76 firstMonitor nMonitor nFixed sFixed cp k) `shouldBe` Right pv
 
+
+
+
+
+
+
+
+
+
+

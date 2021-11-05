@@ -1,14 +1,28 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Q.Stochastic.Process
         where
 import Control.Monad
 import Control.Monad.State
 import Data.RVar
 import Data.Random
+
+
+import Q.Types
+
+import Control.Lens
+import Data.Coerce (coerce)
+
+
+
+
 
 rwalkState :: RVarT (State Double) Double
 rwalkState = do
@@ -33,63 +47,115 @@ instance (Num a) => Num (RVarT m a) where
 
 
 
--- |Discretization of stochastic process over given interval
-class (Num b) => Discretize d b where
-  -- |Discretization of the drift process.
-  dDrift  :: (StochasticProcess a b) => a -> d -> (Time, b) -> RVar b
-  -- |Discretization of the diffusion process.
-  dDiff   :: (StochasticProcess a b) => a -> d -> (Time, b) -> RVar b
-  -- |dt used.
-  dDt     :: (StochasticProcess a b) => a -> d -> (Time, b) -> Time
+newtype StochasticProcessMonad s m a = PM {runSP :: StateT (YearFrac, s) m a} deriving newtype (Functor, Applicative, Monad, MonadTrans , MonadState (YearFrac, s))
+
+
+model :: Monad m => StochasticProcessMonad s m s
+model = gets snd
+time :: Monad m => StochasticProcessMonad s m YearFrac
+time  = gets fst
+
+class HasSpot a where
+  spot :: a -> Spot
 
 
 -- |A stochastic process of the form \(dX_t = \mu(X_t, t)dt + \sigma(S_t, t)dB_t \)
-class (Num b) => StochasticProcess a b where
-  -- |The process drift.
-  pDrift  :: a -> (Time, b) -> RVar b
-  -- |The process diffusion.
-  pDiff   :: a -> (Time, b) -> RVar b
+class StochasticProcess a b | a -> b where
+  pDt :: (Monad m) => b -> StochasticProcessMonad a m YearFrac
+  pDt _ = return $ YearFrac $ 1/365
 
   -- |Evolve a process from a given state to a given time.
-  pEvolve :: (Discretize d b) => a         -- ^The process
-                             -> d         -- ^Discretization scheme
-                             -> (Time, b) -- ^Initial state
-                             -> Time      -- ^Target time t.
-                             -> RVar b    -- ^\(dB_i\).
-                             -> RVar b    -- ^\(X(t)\).
-  pEvolve p disc s0@(t0, x0) t dw = do
-    if t0 >= t then return x0 else do
-      s'@(t', b') <- pEvolve' p disc s0 dw
-      if t' >= t then return b' else pEvolve p disc s' t dw
+  pEvolve :: (MonadRandom m, Distribution d b) =>
+             YearFrac      -- ^Target time t.
+          -> d b        -- ^The innovation distribution
+          -> StochasticProcessMonad a m a
+  pEvolve t b = do
+    s@(t0, a0) <- get
+    if t0 >= t then
+      return a0
+    else do
+      !dw <- lift $ sample b
+      !dt <- pDt dw
+      pEvolve_dt dt dw
+      pEvolve t b
+
 
   -- |Similar to evolve, but evolves the process with the discretization scheme \(dt\).
-  pEvolve' :: (Discretize d b) => a -> d -> (Time, b) -> RVar b -> RVar (Time, b)
-  pEvolve' process discr s@(t, b) dw = do
-    let !newT = t + dDt process discr s
-        !newX = do
-               drift <- dDrift process discr s
-               diff  <- dDiff process discr s
-               dw' <- dw
-               return $ b + drift + diff * dw'
-        newX :: RVar b
+  pEvolve_dt :: (Monad m) => YearFrac -> b -> StochasticProcessMonad a m ()
 
-    (newT,) <$>  newX
+oneTrajectory :: (MonadRandom m, Distribution d b, StochasticProcess p b) => p -> d b -> [YearFrac] -> m [p]
+oneTrajectory s0 d ts = evalStateT (runSP trajectory) (0, s0)
+   where trajectory = mapM (`pEvolve` d) ts
 
--- |Geometric Brownian motion
-data GeometricBrownian = GeometricBrownian {
-    gbDrift :: Double -- ^Drift
-  , gbDiff  :: Double -- ^Vol
+
+trajectories :: (MonadRandom m, Distribution d b, StochasticProcess p b) => Int -> p -> d b ->  [YearFrac] -> m [[p]]
+trajectories n p d ts = replicateM n (oneTrajectory p d ts)
+
+-- |Geometric Brownian motion \( dS_t = rS_t dt + \sigma S_t dW\)
+data GeometricBrownianMotion = GBM {
+    gbDrift :: Double -- ^ Drift
+  , gbDiff  :: Double -- ^ Vol
+  , gbS0    :: Double -- ^ Current value
 } deriving stock (Show)
 
+instance HasSpot  GeometricBrownianMotion where
+  spot GBM{..} = Spot $ gbS0
+evolveGBM :: (YearFrac, GeometricBrownianMotion) -> YearFrac -> Double -> GeometricBrownianMotion
+evolveGBM (YearFrac t, GBM{..}) (YearFrac t') dW = GBM gbDrift gbDiff s'
+  where s' = gbS0 * exp ((gbDrift - 0.5 * gbDiff * gbDiff) * dt + gbDiff * dW * sqrt dt)
+        dt = t' - t
+data HestonModel = HestonModel {
+    _s_0    :: Double
+  , _drift  :: YearFrac -> Rate
+  , _lambda :: Double
+  , _nu     :: Double
+  , _eta    :: Double
+  , _rho    :: Double
+  , _nu_t   :: Double
+  , _x_t    :: Double -- ^ \( log (S_t/S_0) \)
+  }
 
-instance StochasticProcess GeometricBrownian Double where
---  pDrift :: GeometricBrownian -> (Time, Double) -> RVar Double
-  pDrift p (_, x) = return $ gbDrift p * x -- drift is prpotional to the spot.
-  pDiff  p (_, x) = return $ gbDiff p  * x -- diffisuion is also prportional to the spot.
+$(makeLenses ''HestonModel)
+
+instance HasSpot  HestonModel where
+  spot HestonModel{..} = Spot $ _s_0 * exp _x_t
+
+mkHeston :: Spot -> (YearFrac -> Rate) -> Nu -> Lambda -> Eta -> Rho -> Nu -> HestonModel
+mkHeston s0 r nu lambda eta rho nu_t = HestonModel (coerce s0) r (coerce lambda) (coerce nu) (coerce eta) (coerce rho) (coerce nu_t) 0
 
 
--- | Ito process
-data ItoProcess = ItoProcess {
-        ipDrift :: (Time, Double) -> Double,
-        ipDiff  :: (Time, Double) -> Double
-}
+
+
+
+evolveHeston :: (YearFrac, HestonModel) -> YearFrac -> (Double, Double) -> HestonModel
+evolveHeston (YearFrac t, heston@HestonModel{..}) (YearFrac dt) (dW1, dW2) =
+  let (dZ1, dZ2) = correlate _rho dW1 dW2
+      nu_t' = ((sqrt _nu_t) + 0.5 * _eta * (sqrt dt) * dZ2)**2 - _lambda * (_nu_t - _nu) * dt - 0.25 *  _eta * _eta * dt
+      x_t'  = _x_t + (coerce (_drift (YearFrac t)) - 0.5 *  _nu_t) * dt + sqrt (_nu_t * dt) * dZ1
+      in (heston & nu_t .~ nu_t' & x_t .~ x_t')
+  where correlate rho b1 b2 = (b1, rho * b1 + sqrt(1 - rho * rho) * b2)
+
+instance StochasticProcess HestonModel (Double, Double) where
+  pDt _ = return $ 1/365
+  pEvolve_dt dt dW = do
+    (t, heston) <- get
+    let heston' = evolveHeston (t, heston) dt dW
+    put (t + dt, heston')
+
+
+instance StochasticProcess GeometricBrownianMotion Double where
+  pDt _ = return $ 1/360
+  pEvolve t' b = do
+    !dw <- lift $ sample b
+    (!t, !gbm) <- get
+    let gbm'  = evolveGBM (t, gbm) t' dw
+    put (t', gbm')
+    return gbm'
+  pEvolve_dt dt dW = do
+    !gbm <- model
+    !t   <- time
+    let gbm' = evolveGBM (t, gbm) dt dW
+    put (t+dt, gbm')
+
+
+

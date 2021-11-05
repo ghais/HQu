@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE StandaloneKindSignatures   #-}
+{-# LANGUAGE DerivingVia #-}
 
 module Q.Types (
     ISIN
@@ -39,6 +40,18 @@ module Q.Types (
   , YearFrac(..)
   , Rate(..)
   , DF(..)
+  , Alpha(..)
+  , Beta(..)
+  , M(..)
+  , Sigma(..)
+  , V(..)
+  , Phi(..)
+  , P(..)
+  , C(..)
+  , VTil(..)
+  , Lambda(..)
+  , Nu(..)
+  , Eta(..)
   , Vol(..)
   , TotalVar(..)
   , TimeScaleable(..)
@@ -65,6 +78,7 @@ import           Data.Time
 import           Foreign (Storable)
 import           GHC.Generics (Generic)
 import           Q.Time ()
+import Data.Semigroup
 -- | Type for Put or Calls
 data OptionType  = Put | Call deriving (Generic, Eq, Show, Read, Bounded)
 instance Enum OptionType where
@@ -85,35 +99,49 @@ newtype CUSIP = CUSIP String deriving stock (Generic, Eq, Show, Read, Ord)
 
 
 newtype Cash     = Cash    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+                                  deriving Semigroup via Sum Double
+                                  deriving Monoid via Sum Double
 
 newtype Spot     = Spot    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Forward  = Forward Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Forward  = Forward Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)             
 newtype Strike   = Strike  Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+                                  deriving Semigroup via Sum Double
+                                  deriving Monoid via Sum Double
 
 newtype AbsRelStrike = AbsRel Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-
+  deriving Semigroup via Sum Double
+  deriving Monoid via Sum Double
 newtype LogRelStrike = LogRel Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+  deriving Semigroup via Sum Double
+  deriving Monoid via Sum Double
 
 newtype MoneynessForwardStrike = MoneynessForward Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+  deriving Semigroup via Sum Double
+  deriving Monoid via Sum Double
 
 newtype LogMoneynessForwardStrike = LogMoneynessForward Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+  deriving Semigroup via Sum Double
+  deriving Monoid via Sum Double
 
 newtype MoneynessSpotStrike = MoneynessSpot Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+  deriving Semigroup via Sum Double
+  deriving Monoid via Sum Double
 
 newtype LogMoneynessSpotStrike = LogMoneynessSpot Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-
+  deriving Semigroup via Sum Double
+  deriving Monoid via Sum Double
 
 newtype Tolerance = Tolerance    Double
   deriving stock (Generic, Eq, Show, Read, Ord)
@@ -152,16 +180,52 @@ x1 $-$ x2 = coerce $ (coerce x1::Double) - (coerce x2::Double)
 -- Later on i should add roll.
 newtype Expiry   = Expiry   Day    deriving (Generic, Eq, Show, Read, Ord)
 
-newtype Premium  = Premium  Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Delta    = Delta    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Vega     = Vega     Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Gamma    = Gamma    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Theta    = Theta    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Rho      = Rho      Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype YearFrac = YearFrac {unYearFrac:: Double} deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Premium  = Premium  Double deriving stock (Generic, Eq, Show, Ord)
+                                   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Delta    = Delta    Double deriving stock (Generic, Eq, Show, Ord)
+                                   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Vega     = Vega     Double deriving stock (Generic, Eq, Show, Ord)
+                                   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Gamma    = Gamma    Double deriving stock (Generic, Eq, Show, Ord)
+                                   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Theta    = Theta    Double deriving stock (Generic, Eq, Show, Ord)
+                                   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Rho      = Rho      Double deriving stock (Generic, Eq, Show, Ord)
+                                   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
-newtype Rate     = Rate Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype DF       = DF   Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype YearFrac = YearFrac {unYearFrac:: Double} deriving stock (Generic, Eq, Show, Ord)
+                                                 deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype Rate     = Rate Double deriving stock (Generic, Eq, Show, Ord, Read)
+                               deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype DF       = DF   Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+newtype Alpha  = Alpha  Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Beta   = Beta   Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype M      = M      Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype Sigma  = Sigma  Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+
+newtype V      = V      Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype Phi    = Phi    Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype P      = P      Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype C      = C      Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype VTil   = VTil   Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype Lambda = Lambda Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype Nu     = Nu     Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
+newtype Eta    = Eta    Double deriving stock (Generic, Eq, Show, Ord)
+                               deriving newtype (Num, Fractional, Floating)
 
 discountFactor :: YearFrac -> Rate -> DF
 discountFactor (YearFrac t) (Rate r) = DF $ exp ((-r) * t)

@@ -3,8 +3,9 @@ module Q.TermStructures.Yield.DiscountCurve
     Interpolated
   , mkDiscountCurve
   , mkInterpolatedDiscountCurve
-  )
-where
+  ) where
+
+import           Data.Coerce (coerce)
 import qualified Data.SortedList as SortedList
 import           Data.Time.Calendar (Day)
 import           Q.Interpolation
@@ -12,7 +13,6 @@ import           Q.TermStructures
 import           Q.Time (DayCounter, dcYearFraction)
 import           Q.Time.Date
 import           Q.Types
-import Data.Coerce (coerce)
 
 
 
@@ -27,7 +27,9 @@ data Interpolated = Interpolated
   , _maxDate        :: Day
   }
 
--- Make a discount curve where the interpolation is log linear.
+type DiscountCurveFactory = SortedList.SortedList (Day, DF) -> Interpolation YearFrac DF
+
+-- |Make a discount curve where the interpolation is log linear.
 mkDiscountCurve ::
      Day                                   -- ^ Reference date
   -> DayCounter                            -- ^ Day counter
@@ -36,9 +38,12 @@ mkDiscountCurve ::
   -> SortedList.SortedList (Day, DF)       -- ^ Discount factors. If the first discount factor is not (refDate, DF 1)
                                            -- then it will be inserted.
   -> Either String Interpolated
-mkDiscountCurve d dc cal settlementDays discounts = mkInterpolatedDiscountCurve d dc cal settlementDays (LogInterp (linearInterpolator ts (coerce dfs))) discounts
-  where (days, dfs) = unzip $ SortedList.fromSortedList discounts
-        ts          = map (dcYearFraction dc d) days
+mkDiscountCurve d dc cal settlementDays = mkInterpolatedDiscountCurve d dc cal settlementDays f
+  where
+    f :: DiscountCurveFactory
+    f vs = let (days, dfs) = unzip $ SortedList.fromSortedList vs
+               ts          = map (dcYearFraction dc d) days
+               in logLinearInterpolator ts dfs
 
 -- | Make an interpolated discount curve.
 mkInterpolatedDiscountCurve ::
@@ -46,21 +51,25 @@ mkInterpolatedDiscountCurve ::
   -> DayCounter                            -- ^ Day counter
   -> Calendar                              -- ^ Calendar
   -> Int                                   -- ^ Settlement days
-  -> Interpolation YearFrac DF                        -- ^ Interpolation method.
+  -> DiscountCurveFactory                  -- ^ Interpolation method factory
   -> SortedList.SortedList (Day, DF)       -- ^ Discount factors. If the first discount factor is not (refDate, DF 1)
                                            -- then it will be inserted.
   -> Either String Interpolated
 mkInterpolatedDiscountCurve _ _ _ _ _ (SortedList.uncons  -> Nothing) = Left "No discount factors"
-mkInterpolatedDiscountCurve d0 dc cal settlementDays interpolation dfs@(SortedList.uncons -> Just ((d, DF 1), _)) =
-  Right Interpolated
-  {
-    _refDate = d
-  , _dc = dc
-  , _calendar = cal
-  , _settlementDays = settlementDays
-  , _interpolator = interpolation
-  , _maxDate =  (fst. last . SortedList.fromSortedList ) dfs
-  }
+mkInterpolatedDiscountCurve d0 dc cal settlementDays interpolation dfs@(SortedList.uncons -> Just ((d, _), _)) =
+  if d <= d0 then
+    Right Interpolated
+    {
+      _refDate = d0
+    , _dc = dc
+    , _calendar = cal
+    , _settlementDays = settlementDays
+    , _interpolator = interpolation dfs
+    , _maxDate =  (fst . last . SortedList.fromSortedList ) dfs
+    }
+  else
+    mkInterpolatedDiscountCurve d0 dc cal settlementDays interpolation (SortedList.insert  (d0, DF 1) dfs)
+
 mkInterpolatedDiscountCurve d dc cal settlementDays interpolation dfs =
   mkInterpolatedDiscountCurve d dc cal settlementDays interpolation (SortedList.insert  (d, DF 1) dfs)
 
@@ -72,6 +81,19 @@ instance TermStructure Interpolated where
   tsMaxDate Interpolated{..} = _maxDate
 
 instance YieldTermStructure Interpolated where
-  yieldDiscountT Interpolated{..} t = interpolate _interpolator  t
+  yieldDiscountT ts@Interpolated{..} t =
+    if t <= tMax then
+      interpolate _interpolator  t
+    else
+      let (DF dMax) = yieldDiscountT ts tMax
+          instFwdMax = coerce d/dMax
+          (YearFrac dt) = t - tMax
+          d :: Derivative YearFrac DF
+          d = derivative _interpolator tMax
+      in DF $ dMax * exp (instFwdMax * dt)
+    where tMax = tsMaxTime ts
+
+
+
 
 

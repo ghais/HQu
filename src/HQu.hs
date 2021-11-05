@@ -11,10 +11,21 @@ module HQu where
 import Q.Options.ImpliedVol.TimeSlice
 import Q.Options.ImpliedVol.SVI
 import           Graphics.Vega.VegaLite      hiding (repeat, sample)
-import Q.Options.Black76 
+import Q.Options.Black76
 import Numeric.GSL.Integration
+import           Graphics.Gnuplot.Simple
 
 import Q.Types hiding (Rho)
+import Data.RVar (RVar)
+import Q.Options.ImpliedVol.Surface (surfaceTotalVarKT)
+import Data.Coerce
+import Q.Stochastic.Process hiding (rho)
+
+import Data.Random.Distribution.Normal
+
+
+import Data.Random.Distribution
+
 alpha = Alpha (1)
 beta = Beta 0
 rho = Rho (0)
@@ -40,6 +51,40 @@ testOptionIntegration = do
   print integrationPrice
 
 
+heston = mkHeston (Spot 1009) (const 1) (Nu 0.0354) (Lambda 1.3253) (Eta 0.3877) (Rho (- 0.7165)) (Nu 0.0174)
+gbm = GBM 0.05 0.2 100
+ts  = map YearFrac [0,0.01..4]
+
+
+testProcess :: (Distribution d b,  StochasticProcess a b, HasSpot a) => a -> d b -> IO ()
+testProcess p d= do
+  gbms <- oneTrajectory p d  ts
+  plotList [] (zip ((coerce ts)::[Double]) (coerce (map spot gbms)::[Double]))
+
+
+newtype UncorrelatedPair d t = UncorrelatedPair d
+
+instance (Distribution d b) => Distribution (UncorrelatedPair (d b)) (b, b) where
+  rvar (UncorrelatedPair d) = do
+    x1 <- rvar d
+    x2 <- rvar d
+    return (x1, x2)
+testHeston :: IO ()
+testHeston = testProcess heston t where
+  t :: UncorrelatedPair (Normal Double) (Double, Double)
+  t = (UncorrelatedPair StdNormal)
+  
+
+
+testSSVI = do
+  let vol = Vol 0.2
+      rho  = Rho (0.3)
+      lambda = Lambda 0.9
+      ssvi = SSVI (volToTotalVar vol) rho lambda
+      ts   = [0.05, 0.1, 0.2, 0.3, 0.5]::[Double]
+      ks   = [-0.9, -0.89..1.2]::[Double]
+  plotFunc3d [] [] (ks) ts (\k t -> coerce $ surfaceTotalVarKT ssvi (LogRel k) (YearFrac t)::Double)
+
 
 someFunc :: IO ()
 someFunc = do
@@ -62,3 +107,14 @@ someFunc = do
                      ]
       vl = toVegaLite [svic [], layers]
   toHtmlFile "/tmp/totalvar.html" vl
+
+
+x :: RVar Double -> RVar(Double, Double)
+x w = do
+  w' <- w
+  w'' <- w
+  return (w', w'')
+
+
+
+

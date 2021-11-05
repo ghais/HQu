@@ -5,9 +5,11 @@ import Test.Hspec hiding (shouldBe)
 import Q.Options.ImpliedVol.SVI
 import Q.Types hiding (Rho)
 import Q.Options.ImpliedVol.TimeSlice (totalVar)
-import Q.Options.ImpliedVol
+
 import Control.Monad (unless)
 
+import Graphics.Gnuplot.Simple
+import Data.Coerce (coerce)
 
 closeTo :: TotalVar -> TotalVar -> Expectation
 closeTo = compareWith (\x y -> abs (x - y) <= 1e-7) errorMessage where
@@ -16,6 +18,25 @@ closeTo = compareWith (\x y -> abs (x - y) <= 1e-7) errorMessage where
   compareWith comparator errorDesc result expected  = expectTrue errorMsg (comparator expected result)
     where errorMsg = show result ++ " " ++ errorDesc ++ " " ++ show expected
   expectTrue msg b = unless b (expectationFailure msg)
+
+
+
+
+skewTest =
+  let
+    ttm   = YearFrac 1
+    alpha = Alpha 0.1
+    beta  = Beta 0.2
+    rho   = Rho 0
+    m     = M 0
+    sigma = Sigma 0.1
+    svi = RSVI ttm alpha beta rho m sigma
+    strikes = [LogRel k | k <- [-1, -0.9..4]]
+    totalVars = map (totalVar svi)  strikes
+  in do
+    print strikes
+    print totalVars
+    plotList [] ((coerce (zip strikes totalVars))::([(Double, Double)]))
 
 main :: IO ()
 main = hspec $

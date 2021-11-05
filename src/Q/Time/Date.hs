@@ -41,10 +41,10 @@ isWeekend NullGregorian d = isSaturday || isSunday
 isBusinessDay :: Calendar -> Day -> Bool
 isBusinessDay cal d = not (isHoliday cal d && isWeekend cal d)
 
-businessDayBetween :: Calendar -> (Day, Day) -> Int
-businessDayBetween cal (fd, td) = foldl countDays 0 listOfDates
+businessDayBetween :: Calendar -> Day -> Day -> Int
+businessDayBetween cal fd td = foldl countDays 0 listOfDates
   where   countDays counter x     = counter + fromEnum (isBusinessDay cal x)
-          listOfDates             = getDaysBetween (fd, td)
+          listOfDates             = getDaysBetween fd td
 
 nextBusinessDay :: Calendar -> Day -> Day
 nextBusinessDay m d | isBusinessDay m nextDay = nextDay
@@ -54,8 +54,8 @@ nextBusinessDay m d | isBusinessDay m nextDay = nextDay
 
 
 -- | Generate a list of all dates in between [fd, td)
-getDaysBetween ::  (Day, Day) -> [Day]
-getDaysBetween (fd, td) = reverse $ generator fd []
+getDaysBetween ::  Day -> Day -> [Day]
+getDaysBetween fd td = reverse $ generator fd []
   where   generator date x
             | date < td     = generator nextDate (nextDate : x)
             | otherwise     = x

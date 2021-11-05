@@ -8,3 +8,7 @@ extra-deps:
       - packages/gsl
   - git: https://github.com/ghais/LetsBeRational
     commit: 4e3a92d5072ea9ac477a3fe9108ded37cdeddb65
+  - git: https://github.com/ghais/levmar
+    commit: 1f745b67f5506e577b60d638376d1fc1b609a1d9
+  - bindings-levmar-1.1.0.5@sha256:ad8675ff9ff7e892b93e6bc162fa7a1952513fdd4300eaa1247f4f4fa412bd1d,4029
+

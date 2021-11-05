@@ -23,9 +23,6 @@ class (Ord x, Coercible y Double, Coercible Double y) => Interpolator a x y wher
     where (x0, y0) = xMin a
 
 
-
-
-
 type Interpolation :: Type -> Type -> Type
 data Interpolation x y where
   Linear :: (Coercible x Double, Coercible y Double) =>  V.Vector Double -> V.Vector Double -> Interpolation x y
@@ -40,6 +37,11 @@ cubicSplineInterpolator :: (Coercible x Double, Coercible y Double) => [x] -> [y
 cubicSplineInterpolator xs ys = CubicSpline (V.fromList (coerce xs))  (V.fromList (coerce ys))
 akimaSplineInterpolator :: (Coercible x Double, Coercible y Double) => [x] -> [y] -> Interpolation x y
 akimaSplineInterpolator xs ys = AkimaSpline (V.fromList (coerce xs))  (V.fromList (coerce ys))
+
+logLinearInterpolator :: (Coercible x Double, Coercible y Double) => [x] -> [y] -> Interpolation x y
+logLinearInterpolator xs ys = let logYs = map log (coerce ys)
+                                  interpolator = linearInterpolator  xs logYs
+                              in LogInterp interpolator
 
 linear :: (Coercible x Double, Coercible y Double, Floating y, Ord x) => [x] -> [y] -> x -> y
 linear xs ys = interpolate (linearInterpolator xs ys)
@@ -66,9 +68,9 @@ instance (Coercible y Double, Coercible Double y, Floating y, Ord x) =>  Interpo
   interpolate (AkimaSpline  xs ys) x = coerce $ GSL.evaluateV GSL.Akima xs ys (coerce x)
 
   derivative (Linear  xs ys) x = Derivative $ GSL.evaluateDerivativeV  GSL.Linear xs ys (coerce x)
-  derivative (LogInterp f) x = Derivative $ y * df
+  derivative interp@(LogInterp f) x = Derivative $ coerce y * df
     where
-      y = interpolate f x
+      y = interpolate interp x ::y
       (Derivative df) = derivative f x::Derivative x Double
   derivative (CubicSpline  xs ys) x = Derivative $ GSL.evaluateDerivativeV  GSL.CSpline  xs ys (coerce x)
   derivative (AkimaSpline  xs ys) x = Derivative $ GSL.evaluateDerivativeV  GSL.Akima xs ys (coerce x)
