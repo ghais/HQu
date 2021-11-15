@@ -38,6 +38,7 @@ common common-options
                        -Widentities
                        -Wincomplete-uni-patterns
                        -Wincomplete-record-updates
+                       -fllvm
   if impl(ghc >= 8.0)
     ghc-options:       -Wredundant-constraints
   if impl(ghc >= 8.2)
@@ -155,6 +156,8 @@ library
         include-dirs: /usr/local/homebrew/brew/include
         extra-lib-dirs: /usr/local/lib/
         include-dirs: /usr/local/include/
+        extra-lib-dirs: /opt/homebrew/lib/
+        include-dirs: /opt/homebrew/include/
         if arch(i386)
             cc-options: -arch i386
         frameworks: Accelerate
@@ -186,6 +189,7 @@ test-suite bachelier-test
   ghc-options:         -threaded
                        -rtsopts
                        -with-rtsopts=-N
+                       -fllvm
 
 test-suite normalimpliedvol-test
   import:              common-options
@@ -198,7 +202,7 @@ test-suite normalimpliedvol-test
   ghc-options:         -threaded
                        -rtsopts
                        -with-rtsopts=-N
-
+                       -fllvm
 test-suite svi-test
   import:              common-options
   type:                exitcode-stdio-1.0
@@ -210,6 +214,7 @@ test-suite svi-test
   ghc-options:         -threaded
                        -rtsopts
                        -with-rtsopts=-N
+                       -fllvm
 
 benchmark HQu-benchmark
   import:              common-options
@@ -217,9 +222,9 @@ benchmark HQu-benchmark
   hs-source-dirs:      benchmark
   main-is:             Main.hs
   build-depends:       HQu
-                     , gauge
                      , hspec >= 2.7
                      , hspec-expectations >= 0.8
   ghc-options:         -threaded
                        -rtsopts
                        -with-rtsopts=-N
+                       -fllvm

@@ -1,10 +1,13 @@
-resolver: lts-18.7
+resolver: lts-18.16
 
 extra-deps:
   - conversion-1.2.1@sha256:8db4210950736e54be5cd7f7076c19e05d06fb48673eb23638093246a1e7199e,2155
   - git: https://github.com/ghais/hmatrix
-    commit: f2cffb7da8deec70b707a38eb60cb2b78837a099
+    commit: 294ba5b8deedb5e6ba0a6e0f4c84e166ebea4fb0
     subdirs:
       - packages/gsl
   - git: https://github.com/ghais/LetsBeRational
-    commit: 4e3a92d5072ea9ac477a3fe9108ded37cdeddb65
+    commit: 5b8d608c19cc5ca5040d934f07d5300399619983
+
+system-ghc: true
+arch: aarch64
