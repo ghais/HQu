@@ -23,3 +23,4 @@ instance Show Currency where
 
 instance Ord Currency where
   c1 <= c2 = _code c1 <= _code c2
+  

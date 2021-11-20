@@ -12,10 +12,10 @@ import           Numeric.RootFinding as R (RiddersParam (RiddersParam),
                                            ridders)
 import           Q.Options.Bachelier (Bachelier (Bachelier), euOption)
 
+import           Q.Options
+import           Q.Types
 import           Statistics.Distribution (cumulative, density)
 import           Statistics.Distribution.Normal (standard)
-import Q.Options
-
 
 -- | Method to use to calculate the normal implied vol.
 data Method =

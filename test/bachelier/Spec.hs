@@ -5,7 +5,8 @@ import Q.Types
 import Q.Options
 import           Control.Monad (unless)
 
-closeTo x y =  compareWith (\x y -> (abs $ (x - y)) <= 1e-7) errorMessage x y where
+
+closeTo x y =  compareWith (\x y -> (abs $ (x - y)) <= 1e-5) errorMessage x y where
   errorMessage = "Is not close to"
   compareWith :: (HasCallStack, Show a) => (a -> a -> Bool) -> String -> a -> a -> Expectation
   compareWith comparator errorDesc result expected  = expectTrue errorMsg (comparator expected result)
@@ -17,6 +18,8 @@ testOptionValuation b k t v expected = do
       delta = vDelta expected
       vega  = vVega expected
       gamma = vGamma expected
+      theta = vTheta expected
+      rho   = vRho expected
   it ("is priced at " ++ (show p)) $ do
     vPremium v `closeTo` p
   it ("has a " ++ (show delta)) $ do
@@ -25,7 +28,10 @@ testOptionValuation b k t v expected = do
     vVega v `closeTo` vega
   it ("has a " ++ (show gamma)) $ do
     vGamma v `closeTo` gamma
-
+  it ("has a " ++ (show theta)) $ do
+    vTheta v `closeTo` theta
+  it ("has a " ++ (show rho)) $ do
+    vRho v `closeTo` rho
 
 main :: IO ()
 main = hspec $ do
@@ -46,6 +52,8 @@ main = hspec $ do
                            (Delta 0.5)
                            (Vega 0.3989422)
                            (Gamma 0.01994711)
+                           (Theta (-0.010937))
+                           (Rho 0.500008)
             testOptionValuation b k t v expected
           context "1Y 'Put' option atm strike ($100)" $ do
             let k = Strike 100
@@ -57,5 +65,7 @@ main = hspec $ do
                            (Delta 0.5)
                            (Vega 0.3989422)
                            (Gamma 0.01994711)
+                           (Theta (-0.010937))
+                           (Rho 0.5)
             testOptionValuation b k t v expected
 

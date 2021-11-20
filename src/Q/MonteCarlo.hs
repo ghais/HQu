@@ -11,18 +11,20 @@ module Q.MonteCarlo where
 import           Control.Monad.State
 import           Data.RVar
 
-import           Q.Stochastic.Process
-
-import           Q.ContingentClaim
 
 
-import Data.Time
+
+
+
+
 
 
 
 import Q.Types
 
-type Path b = [(Time, b)]
+
+
+type Path b = [(YearFrac, b)]
 
 -- |Summary type class aggregates all priced values of paths
 class (PathPricer p)  => Summary m p | m->p where
@@ -42,45 +44,9 @@ class PathPricer m where
   ppPrice :: m -> Path b -> m
 
 
-type MonteCarlo s a = StateT [(Time, s)] RVar a
+type MonteCarlo s a = StateT [(YearFrac, s)] RVar a
 
 
--- | Generate a single trajectory stopping at each provided time.
-trajectory :: forall a b d. (StochasticProcess a b, Discretize d b) =>
-             d        -- ^ Discretization scheme
-           -> a        -- ^ The stochastic process
-           -> b        -- ^ \(S(0)\)
-           -> [Time]   -- ^ Stopping points \(\{t_i\}_i^n \) where \(t_i > 0\)
-           -> [RVar b] -- ^ \(dW\)s. One for each stopping point.
-           -> RVar [b] -- ^ \(S(0) \cup \{S(t_i)\}_i^n \) 
-trajectory disc p s0 times dws = reverse <$> evalStateT (onePath times dws) initState' where
-  initState' :: [(Time, b)]
-  initState' = [(0, s0)]
-
-  onePath :: [Time] -> [RVar b] -> MonteCarlo b [b]
-  onePath [] _ = do
-    s <- get
-    return $ map snd s
-  onePath (t1:tn) (dw1:dws) = do
-    s <- get
-    let t0 = head s
-    b <- lift $ pEvolve p disc t0 t1 dw1
-    put $ (t1, b) : s
-    onePath tn dws
-
--- | Generate multiple trajectories. See 'trajectory'
-trajectories:: forall a b d. (StochasticProcess a b, Discretize d b) =>
-             Int        -- ^Num of trajectories
-           -> d          -- ^Discretization scheme
-           -> a          -- ^The stochastic process
-           -> b          -- ^\(S(0)\)
-           -> [Time]     -- ^Stopping points \(\{t_i\}_i^n \) where \(t_i > 0\)
-           -> [RVar b]   -- ^\(dW\)s. One for each stopping point.
-           -> RVar [[b]] -- ^\(S(0) \cup \{S(t_i)\}_i^n \) 
-trajectories n disc p initState times dws = replicateM n $ trajectory disc p initState times dws
-
-observationTimes :: ContingentClaim a -> [Day]
-observationTimes = undefined
 
 class Model a b | a -> b where
   discountFactor :: a -> YearFrac -> YearFrac -> RVar Rate

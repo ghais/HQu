@@ -4,7 +4,7 @@ import           Data.List               (intercalate)
 import           Q.Options.Bachelier
 import           Q.Options.ImpliedVol.Normal
 import           Q.Options
-
+import           Q.Types
 import           Test.Hspec              hiding (shouldBe)
 
 

@@ -1,11 +1,14 @@
 module Q.Options (
     Valuation(..)
+  , Theta1D(..)
   , intrinsic
   , hasTimeValue
-  , module Q.Types) where
+  ) where
 
-import Numeric.IEEE
-import Q.Types
+import           Foreign.Storable (Storable)
+import           GHC.Generics (Generic)
+import           Numeric.IEEE
+import           Q.Types
 
 
 data Valuation = Valuation {
@@ -13,6 +16,8 @@ data Valuation = Valuation {
   , vDelta   :: Delta
   , vVega    :: Vega
   , vGamma   :: Gamma
+  , vTheta   :: Theta
+  , vRho     :: Rho
 } deriving stock (Show)
 
 
@@ -32,3 +37,6 @@ hasTimeValue ::
 hasTimeValue cp f k p df =  df `undiscount` p' - (intrinsic cp f k) > epsilon
     where (Premium p') = p
 
+
+newtype Theta1D = Theta1D Double deriving stock (Generic, Eq, Show, Read, Ord)
+                                 deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)

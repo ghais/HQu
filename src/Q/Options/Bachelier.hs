@@ -4,37 +4,53 @@ module Q.Options.Bachelier
   , euOption
   , eucall
   , euput
+  , theta1D
   ) where
 
 import           Control.Monad.State (MonadState (get, put), MonadTrans (lift), StateT)
 import           Data.Random (RVar, stdNormal)
 import           Numeric.GSL.Differentiation (derivCentral)
 import           Q.MonteCarlo (Model (..))
-import           Q.Options (Delta (Delta), Forward (..), Gamma (Gamma), OptionType (..),
-                            Premium (Premium), Rate (..), Strike (..), TimeScaleable (scale),
-                            Valuation (Valuation, vPremium), Vega (Vega), Vol (..),
-                            YearFrac (YearFrac), cpi, volToTotalVar)
+import           Q.Options 
 import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..))
 import           Statistics.Distribution (cumulative)
 import           Statistics.Distribution.Normal (standard)
+import Control.Lens.Internal.Coerce (coerce)
+import Q.Types
 
 data Bachelier = Bachelier YearFrac Forward Rate Vol deriving stock Show
 
 -- | European option valuation with bachelier model.
 euOption ::  Bachelier -> OptionType -> Strike -> Valuation
 euOption (Bachelier (YearFrac t ) (Forward f) (Rate r) (Vol sigma)) cp (Strike k)
-  = Valuation premium delta vega gamma where
-    premium = Premium $ df * (q*(f - k)*n(q*d1) + sigma*sqrt(t)/sqrt2Pi * (exp(-0.5 *d1 * d1)))
-    delta   = Delta   $ df * n (q * d1)
-    vega    = Vega    $ df * (sqrt t) / sqrt2Pi * (exp (-0.5 * d1 * d1))
-    gamma   = Gamma   $ (df/(sigma * (sqrt t)))*(recip sqrt2Pi)*(exp(-0.5 *d1 * d1))
+  = Valuation premium delta vega gamma theta rho where
+    premium    = Premium $ df * (q*(f - k)*n(q*d1) + sigma * sqrt(t) * (n' d1))
+    delta      = Delta   $ df * n (q * d1)
+    vega       = Vega    $ df * (sqrt t) * (n' d1)
+    gamma      = Gamma   $ (df/(sigma * (sqrt t)))*(n' d1)
+    thetaCall  = Theta   $ (-r * (coerce premium)) + df * sigma * (n' d1) / (2 * sqrt t)
+    thetaPut   = Theta   $ -r * (coerce premium) + df * (sigma * (n' d1) / (2 * sqrt t) - 2 * (f - k))
+    rho        = Rho     $ -t * (coerce premium)
+    theta      = if cp == Call then thetaCall else thetaPut
     d1 = (f - k) / (sigma * sqrt(t))
     q = cpi cp
     sqrt2Pi = sqrt (2*pi)
     df =  exp $ (-r) * t
     n = cumulative standard
+    n' d = (recip sqrt2Pi) * (exp(-0.5 * d * d))
+
+
+theta1D :: Bachelier -> OptionType -> Strike -> Theta1D
+theta1D b cp k = coerce $ vPremium (euOption (decayOneDay b) cp k) - vPremium (euOption b cp k)
 
 -- | see 'euOption'
+
+decayOneDay :: Bachelier -> Bachelier
+decayOneDay (Bachelier t f r sigma) = if t < oneDay then
+                                        Bachelier (YearFrac 0.0001) f r sigma
+                                      else
+                                        Bachelier (t - oneDay) f r sigma
+  where oneDay = 1/365
 euput :: Bachelier -> Strike -> Valuation
 euput b =  euOption b Put
 
