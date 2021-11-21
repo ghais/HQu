@@ -1,14 +1,14 @@
 module Main where
-import Test.Hspec hiding (shouldBe)
-import Q.Options.Bachelier
-import Q.Types
-import Q.Options
 import           Control.Monad (unless)
+import           Q.Options
+import           Q.Options.Bachelier
+import           Q.Types
+import           Test.Hspec hiding (shouldBe)
 
 
 closeTo x y =  compareWith (\x y -> (abs $ (x - y)) <= 1e-5) errorMessage x y where
   errorMessage = "Is not close to"
-  compareWith :: (HasCallStack, Show a) => (a -> a -> Bool) -> String -> a -> a -> Expectation
+  compareWith :: ( Show a) =>(a -> a -> Bool) -> String -> a -> a -> Expectation
   compareWith comparator errorDesc result expected  = expectTrue errorMsg (comparator expected result)
     where errorMsg = show result ++ " " ++ errorDesc ++ " " ++ show expected
   expectTrue msg b = unless b (expectationFailure msg)
@@ -52,8 +52,8 @@ main = hspec $ do
                            (Delta 0.5)
                            (Vega 0.3989422)
                            (Gamma 0.01994711)
-                           (Theta (-0.010937))
-                           (Rho 0.500008)
+                           (Theta (-3.9894228040143269))
+                           (Rho (-7.9788456080286538))
             testOptionValuation b k t v expected
           context "1Y 'Put' option atm strike ($100)" $ do
             let k = Strike 100
@@ -65,7 +65,7 @@ main = hspec $ do
                            (Delta 0.5)
                            (Vega 0.3989422)
                            (Gamma 0.01994711)
-                           (Theta (-0.010937))
-                           (Rho 0.5)
+                           (Theta (-3.9894228040143269))
+                           (Rho (-7.9788456080286538))
             testOptionValuation b k t v expected
 

@@ -28,8 +28,8 @@ euOption (Bachelier (YearFrac t ) (Forward f) (Rate r) (Vol sigma)) cp (Strike k
     delta      = Delta   $ df * n (q * d1)
     vega       = Vega    $ df * (sqrt t) * (n' d1)
     gamma      = Gamma   $ (df/(sigma * (sqrt t)))*(n' d1)
-    thetaCall  = Theta   $ (-r * (coerce premium)) + df * sigma * (n' d1) / (2 * sqrt t)
-    thetaPut   = Theta   $ -r * (coerce premium) + df * (sigma * (n' d1) / (2 * sqrt t) - 2 * (f - k))
+    thetaCall  = Theta   $ r * (coerce premium) - df * sigma * (n' d1) / (2 * sqrt t)
+    thetaPut   = Theta   $ r * (coerce premium) - df * (sigma * (n' d1) / (2 * sqrt t) - 2 * (f - k))
     rho        = Rho     $ -t * (coerce premium)
     theta      = if cp == Call then thetaCall else thetaPut
     d1 = (f - k) / (sigma * sqrt(t))
