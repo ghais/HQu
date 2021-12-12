@@ -18,7 +18,7 @@ import           Control.Monad.Except
 import           Data.Coerce
 import           Numeric.GSL (derivCentral)
 import           Q.Options
-import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..))
+import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..), ImpliedDensity(..))
 import           Q.Types
 import           Statistics.Distribution (cumulative, density)
 import           Statistics.Distribution.Normal (standard)
@@ -110,6 +110,8 @@ instance TimeSlice Black76 Strike where
   totalVar Black76{..} _ = TotalVar $ vol * vol * t
     where (Vol vol) = b76Vol
           (YearFrac t) = b76T
+
+instance ImpliedDensity Black76 Strike where 
   dW _ _  = 0
   d2W _ _ = 0
 
@@ -121,6 +123,8 @@ instance TimeSlice Black76 LogRelStrike  where
   totalVar Black76{..} _ = TotalVar $ vol * vol * t
     where (Vol vol) = b76Vol
           (YearFrac t) = b76T
+
+instance ImpliedDensity Black76 LogRelStrike  where
   dW _ _  = 0
   d2W _ _ = 0
 

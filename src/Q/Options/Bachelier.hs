@@ -12,7 +12,7 @@ import           Data.Random (RVar, stdNormal)
 import           Numeric.GSL.Differentiation (derivCentral)
 import           Q.MonteCarlo (Model (..))
 import           Q.Options 
-import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..))
+import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..), ImpliedDensity(..))
 import           Statistics.Distribution (cumulative)
 import           Statistics.Distribution.Normal (standard)
 import Control.Lens.Internal.Coerce (coerce)
@@ -74,6 +74,8 @@ instance Model Bachelier Bachelier where
 
 instance TimeSlice Bachelier Strike where
   totalVar (Bachelier t _ _ vol) _ = volToTotalVar vol t
+
+instance ImpliedDensity Bachelier Strike where
   dW _ _ = 0
   d2W _ _ = 0
   impliedDensity bachelier (Strike k) = let

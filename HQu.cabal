@@ -32,6 +32,7 @@ common common-options
                      , time >= 1.9
                      , data-default-class >= 0.1 && <0.2
                      , ieee754 >= 0.8 && <0.9
+                     , aeson
   
   ghc-options:         -Wall
                        -Wcompat
@@ -81,6 +82,7 @@ library
                        Q.Currencies.Asia
                        Q.Currencies.Europe
                        Q.Currency
+                       Q.Currencies
                        Q.Greeks
                        Q.Interpolation
                        Q.IR

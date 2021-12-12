@@ -7,8 +7,9 @@
 {-# LANGUAGE DerivingVia #-}
 
 module Q.Types (
-    ISIN
-  , CUSIP
+    ISIN(..)
+  , CUSIP(..)
+  , Ticker(..)
   , Observables1(..)
   , Observables2(..)
   , Observables3(..)
@@ -59,6 +60,7 @@ module Q.Types (
   , TimeScaleable(..)
   , Tolerance(..)
   , Derivative(..)
+  , logRelStrike
   , cpi
   , discountFactor
   , discount
@@ -82,7 +84,7 @@ import           GHC.Generics (Generic)
 import           Q.Time ()
 import Data.Semigroup
 -- | Type for Put or Calls
-data OptionType  = Put | Call deriving (Generic, Eq, Show, Read, Bounded)
+data OptionType  = Put | Call deriving stock (Generic, Eq, Show, Read, Bounded)
 instance Enum OptionType where
   succ Call = Put
   succ Put  = Call
@@ -93,20 +95,29 @@ instance Enum OptionType where
   fromEnum Put  = -1
 
 
+cpi :: Num p => OptionType -> p
 cpi Call = 1
 cpi Put  = -1
 
-newtype ISIN = ISIN String deriving stock (Generic, Eq, Show, Read, Ord)
-newtype CUSIP = CUSIP String deriving stock (Generic, Eq, Show, Read, Ord)
+newtype ISIN   = ISIN   String deriving stock (Generic, Eq, Show, Read, Ord)
+newtype CUSIP  = CUSIP  String deriving stock (Generic, Eq, Show, Read, Ord)
+newtype Ticker = Ticker String deriving stock (Generic, Eq, Show, Read, Ord)
 
-
-newtype Cash     = Cash    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Cash     = Cash    Double deriving stock (Generic, Eq, Show, Read, Ord)
+                                  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
                                   deriving Semigroup via Sum Double
                                   deriving Monoid via Sum Double
 
-newtype Spot     = Spot    Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Forward  = Forward Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)             
-newtype Strike   = Strike  Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Spot     = Spot    Double deriving stock (Generic, Eq, Show, Read, Ord)
+                                  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+                                  deriving Semigroup via Sum Double
+                                  deriving Monoid via Sum Double
+newtype Forward  = Forward Double deriving stock (Generic, Eq, Show, Read, Ord)
+                                  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+                                  deriving Semigroup via Sum Double
+                                  deriving Monoid via Sum Double
+newtype Strike   = Strike  Double deriving stock (Generic, Eq, Show, Read, Ord)
+                                  deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
                                   deriving Semigroup via Sum Double
                                   deriving Monoid via Sum Double
 
@@ -115,11 +126,15 @@ newtype AbsRelStrike = AbsRel Double
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
   deriving Semigroup via Sum Double
   deriving Monoid via Sum Double
+
 newtype LogRelStrike = LogRel Double
   deriving stock (Generic, Eq, Show, Read, Ord)
   deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
   deriving Semigroup via Sum Double
   deriving Monoid via Sum Double
+
+logRelStrike :: Forward -> Strike -> LogRelStrike
+logRelStrike (Forward f) (Strike k) = LogRel $ log (k / f)
 
 newtype MoneynessForwardStrike = MoneynessForward Double
   deriving stock (Generic, Eq, Show, Read, Ord)
@@ -179,8 +194,8 @@ x1 $+$ x2 = coerce $ (coerce x1::Double) + (coerce x2::Double)
 ($-$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
 x1 $-$ x2 = coerce $ (coerce x1::Double) - (coerce x2::Double)
 
--- Later on i should add roll.
-newtype Expiry   = Expiry   Day    deriving (Generic, Eq, Show, Read, Ord)
+-- Later on I should add roll.
+newtype Expiry   = Expiry   Day    deriving stock (Generic, Eq, Show, Read, Ord)
 
 newtype Premium  = Premium  Double deriving stock (Generic, Eq, Show, Ord)
                                    deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
@@ -235,22 +250,34 @@ newtype Eta    = Eta    Double deriving stock (Generic, Eq, Show, Ord)
 
 discountFactor :: YearFrac -> Rate -> DF
 discountFactor (YearFrac t) (Rate r) = DF $ exp ((-r) * t)
+discount :: DF -> Double -> Double
 discount (DF df) p = p * df
+
+undiscount :: DF -> Double -> Double
 undiscount (DF df) p = p / df
 
+rateFromDiscount :: YearFrac -> DF -> Rate
 rateFromDiscount (YearFrac t) (DF df) = Rate $ - (log df) / t
 
-newtype Vol      = Vol       Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
-newtype Var      = Var       Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
--- | (\w(S_0, K, T) = \sigma_{BS}(S_0, K, T)T \)
-newtype TotalVar = TotalVar  Double deriving (Generic, Eq, Show, Read, Ord, Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Vol      = Vol       Double deriving stock (Generic, Eq, Show, Ord)
+                                    deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+newtype Var      = Var       Double deriving stock (Generic, Eq, Show, Ord)
+                                    deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
+-- | (\w(S_0, K, T) = \sigma_{BS}(S_0, K, T)T \)
+newtype TotalVar = TotalVar  Double deriving stock (Generic, Eq, Show, Ord)
+                                    deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
+
+totalVarToVol :: TotalVar -> YearFrac -> Vol
 totalVarToVol (TotalVar v) (YearFrac t) = Vol $ sqrt (v / t)
+
+volToTotalVar :: Vol -> YearFrac -> TotalVar
 volToTotalVar (Vol sigma) (YearFrac t) = TotalVar $ sigma * sigma * t
 
 instance FromField OptionType where
-  parseField s | (s == "C" || s == "c") = pure Call
-               | (s == "P" || s == "p")  = pure Put
+  parseField s | s == "C" || s == "c"  = pure Call
+               | s == "P" || s == "p"  = pure Put
+               | otherwise          = undefined
 instance ToField OptionType where
   toField Call = toField ("C"::B.ByteString)
   toField Put  = toField ("P"::B.ByteString)

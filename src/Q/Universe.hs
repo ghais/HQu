@@ -13,7 +13,7 @@ newtype Asset = Asset String deriving newtype (Eq, Show, Read, Ord)
 data Universe = Universe
   {
     _irAssets :: M.Map Currency IR
-  , _eqAssets :: M.Map Asset EQ
+  , _eqAssets :: M.Map Asset EqAsset 
   , _fxAssets :: M.Map (Currency, Currency) FX
   }
 

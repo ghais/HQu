@@ -16,14 +16,16 @@ module Q.SortedVector
   , Q.SortedVector.null
   , Q.SortedVector.length
   , Q.SortedVector.zip
+  , Q.SortedVector.span
   ) where
 
 import Prelude hiding (head, null, length, zip)
 import qualified Data.Vector.Algorithms.Merge  as Merge (sort)
-import qualified Data.Vector as V (Vector, fromList, head, last, modify, null, toList, length, zip)
+import qualified Data.Vector as V (Vector, fromList, head, last, modify, null, toList, length, zip, span)
 
 import Data.Data (Data)
 import qualified GHC.Exts as Exts
+
 
 
 
@@ -68,3 +70,9 @@ length (SortedVector v) = V.length v
 
 zip :: SortedVector a -> V.Vector b -> SortedVector (a,b)
 zip (SortedVector xs) ys = SortedVector (V.zip xs ys)
+
+
+span :: (a -> Bool) -> SortedVector a -> (SortedVector a, SortedVector a)
+span f (SortedVector v) = let (v1, v2) = V.span f v
+                          in (SortedVector v1, SortedVector v2)
+

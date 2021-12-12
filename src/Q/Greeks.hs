@@ -3,16 +3,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Q.Greeks
   (
-    module Q.Types
-  , module Q.Options
-  , Bump (..)
+    Bump (..)
   , DiffMethod(..)
   , Bumpable(..)
   , firstOrder
   ) where
 
-import Q.Types
-import Q.Options
+
 import Data.Coerce
 
 -- | A relative or an absolute bump. Used with numerical Greeks.

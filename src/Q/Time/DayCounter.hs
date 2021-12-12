@@ -13,12 +13,14 @@ import           GHC.Generics
 data DayCounter = Thirty360USA
                 | Thirty360European
                 | Thirty360Italian
+                | Act365_25
                 deriving stock (Generic, Eq, Show, Read)
 
 dcName :: DayCounter -> String
 dcName Thirty360USA      = "Thirty USA"
 dcName Thirty360European = "Thirty Euro"
 dcName Thirty360Italian  = "Thirty Italian"
+dcName Act365_25         = "Act/365.25"
 
 dcYearFraction :: Fractional p => DayCounter -> Day -> Day -> p
 dcYearFraction dc@Thirty360USA fromDate toDate =
@@ -27,7 +29,8 @@ dcYearFraction dc@Thirty360European fromDate toDate =
   fromIntegral (dcCount dc fromDate toDate) / 360.0
 dcYearFraction dc@Thirty360Italian fromDate toDate =
   fromIntegral (dcCount dc fromDate toDate) / 360.0
-
+dcYearFraction dc@Act365_25 fromDate toDate =
+  fromIntegral (dcCount dc fromDate toDate) / 365.25
 
 dcCount :: DayCounter -> Day -> Day -> Int
 dcCount Thirty360USA fd td = 360*(yy2-yy1) + 30*(mm2-mm1-1) + max 0 (30-dd1) + min 30 dd2
@@ -50,6 +53,7 @@ dcCount Thirty360Italian fd td = 360*(yy2-yy1) + 30*(mm2-mm1-1) + max 0 (30-dd1)
           adjust x1 z1
             | z1 == 2 && x1 > 27    = 30
             | otherwise             = x1
+dcCount Act365_25 fd td = fromIntegral $ diffDays td fd
 
 intGregorian ::  Day -> (Int, Int, Int)
 intGregorian date = (fromIntegral y, m, d)

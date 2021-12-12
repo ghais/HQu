@@ -4,9 +4,11 @@ module Q.Time.Date
     Calendar(..)
   ,isHoliday,isBusinessDay,businessDayBetween,nextBusinessDay) where
 
-import           Data.Time
-import           GHC.Generics
 
+import qualified Data.Set as Set
+import Data.Time
+
+import GHC.Generics
 {- |Business Day conventions
  - These conventions specify the algorithm used to adjust a date in case it is not a valid business day.
  -}
@@ -26,29 +28,44 @@ data BusinessDayConvention =
         | Unadjusted         -- ^Do not adjust
         deriving stock (Generic, Show, Eq, Enum)
 
-data Calendar = NullGregorian -- ^ A gregorian calendar with no holidays. Weekends are Sat and Sunday
+newtype SystematicHoliday    = SystematicHoliday [DayOfWeek]
+newtype NonsystmeaticHoliday = NonsystmeaticHoliday (Set.Set Day)
+
+isSystematicHoliday :: Day -> SystematicHoliday -> Bool
+isSystematicHoliday d (SystematicHoliday holidays) = (dayOfWeek  d) `elem` holidays
+
+isNonSystematicHoliday :: Day -> NonsystmeaticHoliday -> Bool
+isNonSystematicHoliday d (NonsystmeaticHoliday holidays) = Set.member d holidays
+
+data Calendar =
+  -- | A gregorian calendar with no holidays. Weekends are Sat and Sunday
+  NullGregorian
+  -- | A calendar of systematic and non systematic holidays
+  | CustomCal SystematicHoliday NonsystmeaticHoliday
 
 
-isHoliday :: Calendar -> Day -> Bool
-isHoliday NullGregorian _ = False
+isHoliday :: Day -> Calendar -> Bool
+isHoliday  _ NullGregorian = False
+isHoliday d (CustomCal _ nonsys) = isNonSystematicHoliday d nonsys
 
-isWeekend :: Calendar -> Day -> Bool
-isWeekend NullGregorian d = isSaturday || isSunday
+isWeekend :: Day -> Calendar -> Bool
+isWeekend d NullGregorian = isSaturday || isSunday
   where isSaturday = dow == Saturday
         isSunday   = dow == Sunday
         dow        = dayOfWeek d
+isWeekend d (CustomCal sys _)  = isSystematicHoliday d sys
 
-isBusinessDay :: Calendar -> Day -> Bool
-isBusinessDay cal d = not (isHoliday cal d && isWeekend cal d)
+isBusinessDay :: Day -> Calendar -> Bool
+isBusinessDay d cal= not (isHoliday d cal && isWeekend d cal)
 
 businessDayBetween :: Calendar -> Day -> Day -> Int
 businessDayBetween cal fd td = foldl countDays 0 listOfDates
-  where   countDays counter x     = counter + fromEnum (isBusinessDay cal x)
+  where   countDays counter x     = counter + fromEnum (isBusinessDay x cal)
           listOfDates             = getDaysBetween fd td
 
-nextBusinessDay :: Calendar -> Day -> Day
-nextBusinessDay m d | isBusinessDay m nextDay = nextDay
-                     | otherwise                = getNextBusinessDay m nextDay
+nextBusinessDay :: Day -> Calendar -> Day
+nextBusinessDay d cal | isBusinessDay nextDay cal = nextDay
+                      | otherwise                = getNextBusinessDay nextDay cal
   where   nextDay = addDays 1 d
 
 
@@ -62,9 +79,9 @@ getDaysBetween fd td = reverse $ generator fd []
            where nextDate   = addDays 1 date
 
 -- | Gets the next working day
-getNextBusinessDay :: Calendar -> Day -> Day
-getNextBusinessDay m d
-  | isBusinessDay m nextDay       = nextDay
-  | otherwise                     = getNextBusinessDay m nextDay
+getNextBusinessDay :: Day -> Calendar ->  Day
+getNextBusinessDay d cal
+  | isBusinessDay nextDay cal       = nextDay
+  | otherwise                     = getNextBusinessDay nextDay cal
   where   nextDay = addDays 1 d
 

@@ -14,7 +14,7 @@ import qualified Q.Options.ImpliedVol.LetsBeRational as B76
 import Control.Monad.Except (runExcept)
 
 
-newtype BSSurface = BSTermSurface { vol :: (Strike, YearFrac) -> Vol}
+newtype BSSurface = BSTermSurface { volKT :: Strike ->  YearFrac -> Vol}
 
 newtype VolShift = VolShift Double
   deriving stock (Generic, Eq, Show, Read, Ord)

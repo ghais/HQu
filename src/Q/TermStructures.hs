@@ -4,21 +4,18 @@ module Q.TermStructures
 
 import           Data.Coerce (coerce)
 import           Data.Time (Day)
-import           Q.IR (Compounding (Continuous), InterestRate (InterestRate), impliedRate)
-import           Q.Time.Date (Calendar)
+import           Q.IR (Compounding (..), InterestRate (InterestRate), impliedRate)
 import           Q.Time.DayCounter (DayCounter, dcYearFraction)
 import           Q.Types (DF (DF), Rate (Rate), YearFrac (YearFrac), Forward, Spot, rateFromDiscount, discountFactor)
 
 
 class TermStructure ts  where
   tsReferenceDate :: ts -> Day
-  tsCalendar :: ts -> Calendar
   tsDayCounter :: ts -> DayCounter
-  tsSettlementDays :: ts -> Int
-  tsMaxDate :: ts -> Day
+  tsMaxDate :: ts -> Maybe Day
 
-  tsMaxTime :: ts -> YearFrac
-  tsMaxTime ts = dcYearFraction (tsDayCounter ts) (tsReferenceDate ts) (tsMaxDate ts)
+  tsMaxTime :: ts -> Maybe YearFrac
+  tsMaxTime ts = fmap (dcYearFraction (tsDayCounter ts) (tsReferenceDate ts)) (tsMaxDate ts)
 
   tsTimeFromReference :: ts -> Day -> YearFrac
   tsTimeFromReference ts = dcYearFraction dc  refDate
@@ -35,6 +32,10 @@ class YieldTermStructure ts where
   yieldContinuousZeroRateT ts t =  rateFromDiscount t df
     where df = yieldDiscountT ts t
 
+
+data NoDiscounting = NoDiscounting
+instance YieldTermStructure NoDiscounting where
+  yieldDiscountT _ _ = 1
 
 class ForwardCurveTermStructure ts where
   tsSpot :: ts -> Spot

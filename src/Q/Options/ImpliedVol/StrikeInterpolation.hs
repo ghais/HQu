@@ -1,33 +1,22 @@
 module Q.Options.ImpliedVol.StrikeInterpolation where
 
-import qualified Q.Interpolation as Interpolation
-import           Q.Types
+
 import qualified Data.SortedList as SortedList
+import qualified Q.Interpolation as Interpolation
+import           Q.Options.ImpliedVol.StrikeSpace
+import           Q.Types
 
 data InterpolationMethod = Linear | Cubic | Akima
 data ExtrapolationMethod = Constant
-                         | ConstantGradient
-                         | ConstantCurvature
 
-data StrikeInterpolation = StrikeInterpolation InterpolationMethod ExtrapolationMethod (SortedList.SortedList (Strike, Vol))
+data StrikeInterpolation x = StrikeInterpolation InterpolationMethod (SortedList.SortedList (x, Vol))
 
 
-mkInterpolator :: StrikeInterpolation -> Interpolation.Interpolation Strike Vol
-mkInterpolator (StrikeInterpolation Linear _ kvs) = Interpolation.linearInterpolator strikes vols
+mkInterpolator :: (StrikeSpace x) => InterpolationMethod -> SortedList.SortedList (x, Vol) -> Interpolation.Interpolation x Vol
+mkInterpolator  Linear kvs = Interpolation.linearInterpolator strikes vols
   where (strikes ,vols) = (unzip . SortedList.fromSortedList) kvs
-mkInterpolator (StrikeInterpolation Cubic _ kvs) = Interpolation.cubicSplineInterpolator strikes vols
+mkInterpolator Cubic kvs = Interpolation.cubicSplineInterpolator strikes vols
   where (strikes ,vols) = (unzip . SortedList.fromSortedList) kvs
-mkInterpolator (StrikeInterpolation Akima _ kvs) = Interpolation.akimaSplineInterpolator strikes vols
+mkInterpolator Akima kvs = Interpolation.akimaSplineInterpolator strikes vols
   where (strikes ,vols) = (unzip . SortedList.fromSortedList) kvs
 
-
-
-instance Interpolation.Interpolator StrikeInterpolation Strike Vol where
-  interpolate method  = Interpolation.interpolate ( mkInterpolator method)
-  derivative method  = Interpolation.derivative (mkInterpolator method)
-  secondDerivative method = Interpolation.secondDerivative (mkInterpolator method)
-  xMin method  = Interpolation.xMin (mkInterpolator method)
-  xMax method = Interpolation.xMax (mkInterpolator method)
-
-
-  

@@ -15,7 +15,21 @@ import Q.Options.Black76
 import Numeric.GSL.Integration
 import           Graphics.Gnuplot.Simple
 
-import Q.Types hiding (Rho)
+import Q.Types
+    ( ($/$),
+      volToTotalVar,
+      DF(DF),
+      Forward(Forward),
+      Kappa(Kappa),
+      Lambda(Lambda),
+      LogRelStrike(LogRel),
+      Spot(Spot),
+      Strike(Strike),
+      Theta(Theta),
+      TotalVar(TotalVar),
+      Var(Var),
+      Vol(Vol),
+      YearFrac(YearFrac) )
 import Data.RVar (RVar)
 import Q.Options.ImpliedVol.Surface (surfaceTotalVarKT)
 import Data.Coerce
@@ -26,6 +40,8 @@ import Q.Stochastic.Process hiding (rho)
 
 import Data.Random.Distribution
 import Data.Random.Distribution.Normal (Normal(StdNormal), stdNormal)
+import Q.Universe.IR
+import Q.TermStructures
 
 alpha = Alpha (1)
 beta = Beta 0
@@ -114,3 +130,15 @@ x w = do
 
 
 
+
+testIR = do
+  ir <- irFromFile "/tmp/a.json"
+  case ir of
+    Left str -> error str
+    Right p -> printDiscount p
+
+
+printDiscount IR{..} = do
+  let ts  = map YearFrac [0, 0.01..10]
+      dfs = map (yieldDiscountT _ibor1mCurve) ts
+  plotList [] (zip (coerce ts::[Double]) (coerce dfs::[Double]))

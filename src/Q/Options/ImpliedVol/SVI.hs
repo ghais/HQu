@@ -83,7 +83,7 @@ instance TimeSlice SVI LogRelStrike  where
     TotalVar $ max 0.0 (0.5 * totVar * (1 + rho * phi * k + sqrt((phi * k + rho)** 2 + 1 - rho**2)))
       where totVar = ttm * sigma * sigma
             phi    = alpha / sigma / sqrt ttm
-
+instance ImpliedDensity SVI LogRelStrike  where
   dW svi k = dW (sviTV svi) k
 
   d2W svi k = d2W (sviTV svi) k
