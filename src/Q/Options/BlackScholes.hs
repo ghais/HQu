@@ -10,7 +10,7 @@ module Q.Options.BlackScholes (
 ) where
 
 import           Control.Monad.State
-import           Data.Random                    hiding (Gamma)
+import           Data.Random hiding (Gamma)
 
 
 
@@ -67,7 +67,7 @@ euOption bs@BlackScholes{..} t cp k =
 
 -- | see 'euOption'
 euput bs t = euOption bs t Put
- 
+
 -- | see 'euOption'
 eucall bs t = euOption bs t Call
 

@@ -1,33 +1,40 @@
-{-# LANGUAGE FunctionalDependencies #-}
+
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE QuantifiedConstraints  #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TupleSections          #-}
-{-# LANGUAGE TypeOperators          #-}
+
+
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE MonoLocalBinds         #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE BangPatterns #-}
+
 
 module Q.Stochastic.Process
         where
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Data.RVar
 import           Data.Random
-
+import GHC.Exts
 
 import Q.Types
     ( Var(..),
       Spot(..),
-      YearFrac(YearFrac),
+      DF(..),
+      YearFrac(..),
+      Forward(..),
       Rate(..),
       Theta(..),
       Rho(..),
       Sigma(..),
-      Kappa(..) )
-import Data.Coerce
+      Kappa(..), ($/$) )
 
-newtype ProcessDrift  = ProcessDrift {unDrift :: YearFrac -> YearFrac -> Double}
+import Q.TermStructures (YieldTermStructure, yieldDiscountT, ForwardCurveTermStructure (tsForwardT), tsForwardT)
+
+
+
+newtype ProcessDrift  = ProcessDrift {integratedDrift :: YearFrac -> YearFrac -> Double}
 
 
 newtype ConstDistribution t = ConstDistribution t
@@ -48,8 +55,16 @@ drift (ProcessDrift f) = f
 constantDrift :: Rate -> ProcessDrift
 constantDrift (Rate mu) = ProcessDrift (\_ _ -> mu)
 
+discountImpliedDrift :: (YieldTermStructure r) => r -> ProcessDrift
+discountImpliedDrift r = ProcessDrift u
+  where u t dt | dt <= 1e-6 = u t 1e-6
+               | otherwise = log (yieldDiscountT r t / yieldDiscountT r (t + dt)) $/$ dt
 
 
+forwardCurveImpliedDrift :: (ForwardCurveTermStructure f) => f -> ProcessDrift
+forwardCurveImpliedDrift f = ProcessDrift u
+  where u t dt | dt <= 1e-6 = u t 1e-6
+               | otherwise = log (tsForwardT f (t + dt) / tsForwardT f t) $/$ dt
 
 newtype StochasticProcessMonad s m a = PM {runSP :: StateT (YearFrac, s) m a} deriving newtype (Functor, Applicative, Monad, MonadTrans , MonadState (YearFrac, s))
 
@@ -66,11 +81,42 @@ class HasSpot a where
   spot :: a -> Spot
 
 
+class ProcessState p s where
+  pSpot :: p -> s -> Spot
+
+
 -- |A stochastic process of the form \(dX_t = \mu(X_t, t)dt + \sigma(S_t, t)dB_t \)
-class StochasticProcess p s b where
+class (ProcessState p s) => StochasticProcess p s b where
   pEvolve :: (MonadRandom m, Distribution d b) => p -> d b -> YearFrac -> StochasticProcessMonad s m Spot
+  pEvolve p d dt = do
+    !b <- lift $ sample d
+    pEvolve' p b dt
+
+  pEvolve' :: (Monad m) => p -> b -> YearFrac -> StochasticProcessMonad s m Spot
 
 
+class LocalVol lv where
+  lvDrift     :: lv -> ProcessDrift
+  lvLogSigmaSvt :: lv -> Spot -> YearFrac -> Double
+
+  lvLogSigmaSvtdt :: lv -> Spot -> YearFrac -> YearFrac -> Double
+  lvLogSigmaSvtdt lv s t dt = (lvLogSigmaSvt lv s t + lvLogSigmaSvt lv s (t + dt))/2
+
+  lvLogDriftSvtDt :: lv -> Spot -> YearFrac -> YearFrac -> Double
+  lvLogDriftSvtDt lv s t dt  = let vol =  lvLogSigmaSvtdt lv s t dt
+                               in drift (lvDrift lv) t dt  - 0.5 * vol * vol;
+
+
+instance  ProcessState lv Spot where
+  pSpot _ s = s
+
+instance {-# OVERLAPPABLE #-} (LocalVol lv) => StochasticProcess lv Spot Double where
+  pEvolve' lv dW (YearFrac dt) = do
+    s  <- stateVariables
+    t  <- time
+    let s' = s * coerce (exp (lvLogDriftSvtDt lv s t (YearFrac dt) * dt + lvLogSigmaSvtdt lv s t (YearFrac dt) * dW * sqrt dt))
+    put (t + coerce dt, s')
+    return s'
 
 -- | A stochastic local vol process which satisfies
 -- |
@@ -112,7 +158,7 @@ slvLogDriftSvt p s v t dt =
 -- |
 -- | \( dV(t) = \mu_v(V(t)) * dt + \sigma_v(V(t)) * dW2(t) \)
 -- |
- -- | The model in log space is:
+  -- | The model in log space is:
 -- | \( dln(S(t)) =  (\mu(t) - 0.5 * \gamma^2(v)) * dt + \gamma(v) * dW1(t) \)
 class StochasticVol p where
   svGamma :: p -> Var -> Double
@@ -123,7 +169,7 @@ class StochasticVol p where
 
 
 
-instance (StochasticVol p) => SLVProcess p where
+instance {-# OVERLAPPABLE #-} (StochasticVol p) => SLVProcess p where
   slvLeverage _ _ _ _ = 1
   slvGamma            = svGamma
   slvDrift            = svDrift
@@ -132,19 +178,22 @@ instance (StochasticVol p) => SLVProcess p where
   slvVarianceVol      = svVarianceVol
 
 
+instance ProcessState sv (Spot, v) where
+  pSpot _ (s, _) = s
+
 
 
 instance (StochasticVol p) => StochasticProcess p (Spot, Var) (Double, Double) where
-  pEvolve p d dt = do
+  pEvolve' p dZ1dZ2 dt = do
     (s0, v0)   <- stateVariables
     t          <- time
-    (dW1, dW2) <- svCorrelate p <$> lift (sample d)
-    let vol     = svGamma p v0
-        u       = ((drift (svDrift p) t dt) - (0.5 * vol * vol)) * coerce dt
-        s'      = Spot $ coerce s0 * exp (u + vol * sqrt(coerce dt) * dW1)
-        mu_v    = svVarianceDrift p v0
-        sigma_v = svVarianceVol p v0
-        v'      = Var $ mu_v * coerce dt + sigma_v * dW2 * sqrt(coerce dt)
+    let (dW1, dW2) = svCorrelate p dZ1dZ2
+        vol        = svGamma p v0
+        u          = (drift (svDrift p) t dt - 0.5 * vol * vol) * coerce dt
+        s'         = Spot $ coerce s0 * exp (u + vol * sqrt(coerce dt) * dW1)
+        mu_v       = svVarianceDrift p v0
+        sigma_v    = svVarianceVol p v0
+        v'         = Var $ mu_v * coerce dt + sigma_v * dW2 * sqrt(coerce dt)
     put (t + dt, (s', v'))
     return s'
 
@@ -154,12 +203,24 @@ oneTrajectory p s0 d ts = let trajectory = mapM (pEvolve p d) dts
                               dts        = zipWith (-) (tail ts) ts
                           in evalStateT (runSP trajectory) (0, s0)
 
+oneTrajectory' :: (Distribution d b, StochasticProcess p s b, MonadRandom m) => p -> s -> d b -> [YearFrac] -> m Spot
+oneTrajectory' p s0 d ts = let trajectory = do
+                                 mapM_ (pEvolve p d) dts
+                                 pSpot p <$> stateVariables
+                               dts        = zipWith (-) (tail ts) ts
+                           in evalStateT (runSP trajectory) (0, s0)
 
+trajectories :: (MonadRandom m, Distribution d b, StochasticProcess p s b ) => Int -> p -> s -> d b -> [YearFrac]-> m [[Spot]]
+trajectories n p s d ts = replicateM n (oneTrajectory p s d ts)
 
+trajectories' :: (Distribution d b, StochasticProcess p s b, MonadRandom m) =>Int -> p -> s -> d b -> [YearFrac] -> m [Spot]
+trajectories' n p s d ts = replicateM n (oneTrajectory' p s d ts)
 
+evolve :: (MonadRandom m, Distribution d b, StochasticProcess p s b) => p -> s -> d b -> [YearFrac] -> m [Spot]
+evolve p s0 d ts = let trajectory = mapM (pEvolve p d) dts
+                       dts        = zipWith (-) (tail ts) ts
+                    in evalStateT (runSP trajectory) (0, s0)
 
-trajectories :: (MonadRandom m, Distribution d b, StochasticProcess p s b ) => Int -> p -> s -> d b -> [YearFrac]-> [m [Spot]]
-trajectories n p d ts = replicateM n (oneTrajectory p d ts)
 
 
 -- |Geometric Brownian motion \( dS_t = rS_t dt + \sigma S_t dW\)
@@ -169,14 +230,15 @@ data GeometricBrownianMotion = GBM {
 } deriving stock (Show)
 
 
-instance StochasticProcess GeometricBrownianMotion Spot Double where
-  pEvolve GBM{..} d (YearFrac dt) = do
+instance {-# OVERLAPPABLE #-} StochasticProcess GeometricBrownianMotion Spot Double where
+  pEvolve' GBM{..} dW (YearFrac dt) = do
     (Spot s0)     <- stateVariables
     (YearFrac t0) <- time
-    dW <- lift (sample d)
     let s' = s0 * exp ((gbDrift - 0.5 * gbDiff * gbDiff) * dt + gbDiff * dW * sqrt dt)
     put (YearFrac (t0 + dt), Spot s')
     return $ Spot s'
+
+
 
 
 data HestonModel = HestonModel
@@ -194,49 +256,6 @@ instance StochasticVol HestonModel where
   svVarianceDrift HestonModel{..} (Var v)   = coerce _kappa * (coerce _theta - v)
   svVarianceVol p@HestonModel{..} (Var v)   = let vol = svGamma p (Var v)
                                               in coerce _sigma * vol
-{-
-$(makeLenses ''HestonModel)
 
-instance HasSpot  HestonModel where
-  spot HestonModel{..} = Spot $ _s_0 * exp _x_t
-
-mkHeston :: Spot -> (YearFrac -> Rate) -> Nu -> Lambda -> Eta -> Rho -> Nu -> HestonModel
-mkHeston s0 r nu lambda eta rho nu_t = HestonModel (coerce s0) r (coerce lambda) (coerce nu) (coerce eta) (coerce rho) (coerce nu_t) 0
-
-
-
-
-
-evolveHeston :: (YearFrac, HestonModel) -> YearFrac -> (Double, Double) -> HestonModel
-evolveHeston (YearFrac t, heston@HestonModel{..}) (YearFrac dt) (dW1, dW2) =
-  let (dZ1, dZ2) = correlate _rho dW1 dW2
-      nu_t' = ((sqrt _nu_t) + 0.5 * _eta * (sqrt dt) * dZ2)**2 - _lambda * (_nu_t - _nu) * dt - 0.25 *  _eta * _eta * dt
-      x_t'  = _x_t + (coerce (_drift (YearFrac t)) - 0.5 *  _nu_t) * dt + sqrt (_nu_t * dt) * dZ1
-      in (heston & nu_t .~ nu_t' & x_t .~ x_t')
-  where correlate rho b1 b2 = (b1, rho * b1 + sqrt(1 - rho * rho) * b2)
-
-instance StochasticProcess HestonModel (Double, Double) where
-  pDt _ = return $ 1/365
-  pEvolve_dt dt dW = do
-    (t, heston) <- get
-    let heston' = evolveHeston (t, heston) dt dW
-    put (t + dt, heston')
-
-
-instance StochasticProcess GeometricBrownianMotion Double where
-  pDt _ = return $ 1/360
-  pEvolve t' b = do
-    !dw <- lift $ sample b
-    (!t, !gbm) <- get
-    let gbm'  = evolveGBM (t, gbm) t' dw
-    put (t', gbm')
-    return gbm'
-  pEvolve_dt dt dW = do
-    !gbm <- model
-    !t   <- time
-    let gbm' = evolveGBM (t, gbm) dt dW
-    put (t+dt, gbm')
-
-
-
---}
+correlated :: Rho -> (Double, Double) -> (Double, Double)
+correlated (Rho rho) (z1, z2) = (z1, rho * z1 + sqrt(1 - rho * rho) * z2)

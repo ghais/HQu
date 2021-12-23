@@ -6,7 +6,7 @@ import           Data.Coerce (coerce)
 import           Data.Time (Day)
 import           Q.IR (Compounding (..), InterestRate (InterestRate), impliedRate)
 import           Q.Time.DayCounter (DayCounter, dcYearFraction)
-import           Q.Types (DF (DF), Rate (Rate), YearFrac (YearFrac), Forward, Spot, rateFromDiscount, discountFactor)
+import           Q.Types (DF (DF), Rate (Rate), YearFrac (YearFrac), Forward(..), Spot(..), rateFromDiscount, discountFactor)
 
 
 class TermStructure ts  where
@@ -38,8 +38,17 @@ instance YieldTermStructure NoDiscounting where
   yieldDiscountT _ _ = 1
 
 class ForwardCurveTermStructure ts where
-  tsSpot :: ts -> Spot
   tsForwardT :: ts -> YearFrac -> Forward
+  tsSpot     :: ts -> Spot
+  tsSpot ts = coerce $ tsForwardT ts 0
+
+data FwdCurve r = YieldFwdCurve Spot r
+
+instance (YieldTermStructure r) => ForwardCurveTermStructure (FwdCurve r)  where
+  tsForwardT (YieldFwdCurve (Spot s) r) t = Forward $ s / df
+    where (DF df) = yieldDiscountT r t
+
+  tsSpot (YieldFwdCurve s _) = s
 
 yieldDiscount :: (YieldTermStructure ts, TermStructure ts) => ts -> Day -> DF
 yieldDiscount ts day = yieldDiscountT ts t

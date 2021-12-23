@@ -81,8 +81,9 @@ import           Data.Kind
 import           Data.Time
 import           Foreign (Storable)
 import           GHC.Generics (Generic)
-import           Q.Time ()
+import           Q.Time (parseDay, dayToString)
 import Data.Semigroup
+import Data.Maybe (fromJust)
 -- | Type for Put or Calls
 data OptionType  = Put | Call deriving stock (Generic, Eq, Show, Read, Bounded)
 instance Enum OptionType where
@@ -182,17 +183,17 @@ deriving newtype instance Storable (Derivative x y)
 
 
 
-($*$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
-x1 $*$ x2 = coerce $ (coerce x1::Double) * (coerce x2::Double)
+($*$) :: (Coercible a Double, Coercible b Double) => a -> b -> Double
+x1 $*$ x2 = (coerce x1::Double) * (coerce x2::Double)
 
-($/$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
-x1 $/$ x2 = coerce $ (coerce x1::Double) / (coerce x2::Double)
+($/$) :: (Coercible a Double, Coercible b Double) => a -> b -> Double
+x1 $/$ x2 = (coerce x1::Double) / (coerce x2::Double)
 
-($+$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
-x1 $+$ x2 = coerce $ (coerce x1::Double) + (coerce x2::Double)
+($+$) :: (Coercible a Double, Coercible b Double) => a -> b -> Double
+x1 $+$ x2 = (coerce x1::Double) + (coerce x2::Double)
 
-($-$) :: (Coercible a Double, Coercible b Double) => a -> b -> a
-x1 $-$ x2 = coerce $ (coerce x1::Double) - (coerce x2::Double)
+($-$) :: (Coercible a Double, Coercible b Double) => a -> b -> Double
+x1 $-$ x2 = (coerce x1::Double) - (coerce x2::Double)
 
 -- Later on I should add roll.
 newtype Expiry   = Expiry   Day    deriving stock (Generic, Eq, Show, Read, Ord)
@@ -268,11 +269,11 @@ newtype Var      = Var       Double deriving stock (Generic, Eq, Show, Ord)
 newtype TotalVar = TotalVar  Double deriving stock (Generic, Eq, Show, Ord)
                                     deriving newtype (Num, Fractional, Real, RealFrac, RealFloat, Floating, Storable)
 
-totalVarToVol :: TotalVar -> YearFrac -> Vol
-totalVarToVol (TotalVar v) (YearFrac t) = Vol $ sqrt (v / t)
+totalVarToVol :: YearFrac -> TotalVar -> Vol
+totalVarToVol  (YearFrac t) (TotalVar v) = Vol $ sqrt (v / t)
 
-volToTotalVar :: Vol -> YearFrac -> TotalVar
-volToTotalVar (Vol sigma) (YearFrac t) = TotalVar $ sigma * sigma * t
+volToTotalVar :: YearFrac -> Vol -> TotalVar
+volToTotalVar (YearFrac t) (Vol sigma) = TotalVar $ sigma * sigma * t
 
 instance FromField OptionType where
   parseField s | s == "C" || s == "c"  = pure Call
@@ -299,9 +300,9 @@ instance ToField Strike where
   toField (Strike k) = toField k
 
 instance FromField Expiry where
-  parseField s = Expiry <$> parseField s
+  parseField s = Expiry <$> (fromJust . parseDay <$> parseField s)
 instance ToField   Expiry where
-  toField (Expiry k) = toField k
+  toField (Expiry k) = toField (dayToString k)
 
 instance FromField Premium where
     parseField s = Premium <$> parseField s

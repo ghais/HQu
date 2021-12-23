@@ -33,6 +33,8 @@ common common-options
                      , data-default-class >= 0.1 && <0.2
                      , ieee754 >= 0.8 && <0.9
                      , aeson
+                     , primitive >= 0.7
+                     , mwc-random
   
   ghc-options:         -Wall
                        -Wcompat
@@ -40,6 +42,7 @@ common common-options
                        -Wincomplete-uni-patterns
                        -Wincomplete-record-updates
                        -fllvm
+                       -O2
   if impl(ghc >= 8.0)
     ghc-options:       -Wredundant-constraints
   if impl(ghc >= 8.2)
@@ -73,6 +76,12 @@ library
   import:              common-options
   hs-source-dirs:      src
   exposed-modules:     HQu
+                       Q.Universe
+                       Q.TermStructures.Interpolated
+                       Q.TermStructures.Yield.ZeroCurve
+                       Q.Universe.FX
+                       Q.Universe.EQ
+                       Q.Universe.IR
                        Q.Correlation
                        Q.Options.ImpliedVol.VolCube
                        Q.SortedVector
@@ -101,6 +110,8 @@ library
                        Q.Options.ImpliedVol.SVI
                        Q.Options.ImpliedVol.TimeSlice
                        Q.Options.ImpliedVol.Curran
+                       Q.Options.ImpliedVol.StrikeSpace
+                       Q.Stochastic.DupireLocalVol
                        Q.Options.Pricing.Curran
                        Q.Payoff
                        Q.Plotting
@@ -109,6 +120,8 @@ library
                        Q.Stochastic
                        Q.Stochastic.Discretize
                        Q.Stochastic.Process
+                       Q.Stochastic.CEV
+                       Q.Stochastic.HypHyp
                        Q.TermStructures
                        Q.TermStructures.Yield.DiscountCurve                       
                        Q.Time
@@ -121,7 +134,7 @@ library
   autogen-modules:
                        Paths_HQu
   build-depends:
-                      bytestring >=0.10 && <0.12
+                  bytestring >=0.10 && <0.12
                 , LetsBeRational >= 1.0.0
                 , cassava >=0.5
                 , containers >= 0.6.2 && <0.7
@@ -185,6 +198,40 @@ library
  extra-libraries: gsl
  pkgconfig-depends: gsl
 
+executable HQu-exe
+  import:  common-options
+  main-is: Main.hs
+  other-modules:
+      Paths_HQu
+  autogen-modules:
+      Paths_HQu
+  hs-source-dirs:
+      app  
+  build-depends:       HQu
+                     , random-source
+                     , gnuplot
+                     , statistics >= 0.15.2 && < 0.16
+                     , gnuplot >= 0.5.6.1
+                     , hspec >= 2.7
+                     , hspec-expectations >= 0.8
+                     , levmar >= 1.2
+                     , levmar >= 1.2.1.7
+                     , sorted-list >= 0.2.1.0 && < 0.3
+                     , vector >= 0.12.1 && < 0.13
+                     , random-fu >= 0.2.7.7
+                     , rvar
+                     , hmatrix >= 0.18 && <0.30
+                     , hmatrix-gsl >= 0.19 && <0.20
+                     , hvega
+
+  default-language: Haskell2010
+  ghc-options:
+              -threaded
+              -rtsopts
+              -with-rtsopts=-N
+              -O2
+
+
 
 test-suite bachelier-test
   import:              common-options
@@ -201,24 +248,6 @@ test-suite bachelier-test
                        -with-rtsopts=-N
 
 
-test-suite ir-test
-  import:              common-options
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test/ir
-  main-is:             IrSpec.hs
-  build-depends:       HQu
-                     , gnuplot
-                     , gnuplot >= 0.5.6.1
-                     , hspec >= 2.7
-                     , hspec-expectations >= 0.8
-                     , levmar >= 1.2
-                     , levmar >= 1.2.1.7
-                     , sorted-list >= 0.2.1.0 && < 0.3
-                     , vector >= 0.12.1 && < 0.13
-  ghc-options:         -threaded
-                       -rtsopts
-                       -with-rtsopts=-N
-                       -fllvm
 
 test-suite normalimpliedvol-test
   import:              common-options
@@ -234,6 +263,7 @@ test-suite normalimpliedvol-test
                        -rtsopts
                        -with-rtsopts=-N
                        -fllvm
+
 test-suite svi-test
   import:              common-options
   type:                exitcode-stdio-1.0
@@ -249,17 +279,3 @@ test-suite svi-test
                        -with-rtsopts=-N
                        -fllvm
 
-benchmark HQu-benchmark
-  import:              common-options
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      benchmark
-  main-is:             Main.hs
-  build-depends:       HQu
-                     , gnuplot >= 0.5.6.1
-                     , hspec >= 2.7
-                     , hspec-expectations >= 0.8
-                     , levmar >= 1.2.1.7
-  ghc-options:         -threaded
-                       -rtsopts
-                       -with-rtsopts=-N
-                       -fllvm

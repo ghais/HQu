@@ -19,9 +19,28 @@ import           Data.Coerce
 import           Numeric.GSL (derivCentral)
 import           Q.Options
 import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..), ImpliedDensity(..))
-import           Q.Types
+import Q.Types
+    ( discount,
+      rateFromDiscount,
+      DF,
+      Delta(Delta),
+      Forward(..),
+      Gamma(Gamma),
+      LogRelStrike,
+      OptionType(..),
+      Premium(Premium),
+      Rate(..),
+      Rho(Rho),
+      Strike(..),
+      Theta(Theta),
+      TimeScaleable(scale),
+      TotalVar(..),
+      Vega(Vega),
+      Vol(..),
+      YearFrac(YearFrac) )
 import           Statistics.Distribution (cumulative, density)
 import           Statistics.Distribution.Normal (standard)
+
 
 
 data Black76 = Black76 {
@@ -131,3 +150,6 @@ instance ImpliedDensity Black76 LogRelStrike  where
   impliedDensity bs k = impliedDensity f k where
     f :: LogRelStrike  -> TotalVar
     f = totalVar bs
+
+
+

@@ -7,16 +7,19 @@ module Q.Options.Bachelier
   , theta1D
   ) where
 
+import           Control.Lens.Internal.Coerce (coerce)
 import           Control.Monad.State (MonadState (get, put), MonadTrans (lift), StateT)
 import           Data.Random (RVar, stdNormal)
 import           Numeric.GSL.Differentiation (derivCentral)
 import           Q.MonteCarlo (Model (..))
-import           Q.Options 
-import           Q.Options.ImpliedVol.TimeSlice (TimeSlice (..), ImpliedDensity(..))
+import           Q.Options (Theta1D (..), Valuation (Valuation, vPremium))
+import           Q.Options.ImpliedVol.TimeSlice (ImpliedDensity (..), TimeSlice (..))
+import           Q.Types (Delta (Delta), Forward (..), Gamma (Gamma), OptionType (..),
+                          Premium (Premium), Rate (..), Rho (Rho), Strike (..), Theta (Theta),
+                          TimeScaleable (scale), Vega (Vega), Vol (..), YearFrac (YearFrac), cpi,
+                          volToTotalVar)
 import           Statistics.Distribution (cumulative)
 import           Statistics.Distribution.Normal (standard)
-import Control.Lens.Internal.Coerce (coerce)
-import Q.Types
 
 data Bachelier = Bachelier YearFrac Forward Rate Vol deriving stock Show
 
@@ -24,20 +27,20 @@ data Bachelier = Bachelier YearFrac Forward Rate Vol deriving stock Show
 euOption ::  Bachelier -> OptionType -> Strike -> Valuation
 euOption (Bachelier (YearFrac t ) (Forward f) (Rate r) (Vol sigma)) cp (Strike k)
   = Valuation premium delta vega gamma theta rho where
-    premium    = Premium $ df * (q*(f - k)*n(q*d1) + sigma * sqrt(t) * (n' d1))
+    premium    = Premium $ df * (q*(f - k)*n(q*d1) + sigma * sqrt t * n' d1)
     delta      = Delta   $ df * n (q * d1)
-    vega       = Vega    $ df * (sqrt t) * (n' d1)
-    gamma      = Gamma   $ (df/(sigma * (sqrt t)))*(n' d1)
-    thetaCall  = Theta   $ r * (coerce premium) - df * sigma * (n' d1) / (2 * sqrt t)
-    thetaPut   = Theta   $ r * (coerce premium) - df * (sigma * (n' d1) / (2 * sqrt t) - 2 * (f - k))
-    rho        = Rho     $ -t * (coerce premium)
+    vega       = Vega    $ df * sqrt t * n' d1
+    gamma      = Gamma   $ df/(sigma * (sqrt t))*n' d1
+    thetaCall  = Theta   $ r * coerce premium - df * sigma * n' d1 / (2 * sqrt t)
+    thetaPut   = Theta   $ r * coerce premium - df * (sigma * n' d1 / (2 * sqrt t) - 2 * (f - k))
+    rho        = Rho     $ -t * coerce premium
     theta      = if cp == Call then thetaCall else thetaPut
-    d1 = (f - k) / (sigma * sqrt(t))
+    d1 = (f - k) / (sigma * sqrt t)
     q = cpi cp
     sqrt2Pi = sqrt (2*pi)
     df =  exp $ (-r) * t
     n = cumulative standard
-    n' d = (recip sqrt2Pi) * (exp(-0.5 * d * d))
+    n' d = recip sqrt2Pi * exp(-0.5 * d * d)
 
 
 theta1D :: Bachelier -> OptionType -> Strike -> Theta1D
@@ -66,14 +69,14 @@ instance Model Bachelier Bachelier where
   evolve _ (YearFrac t) = do
     (YearFrac t0, Bachelier _ (Forward f0) (Rate r) (Vol sigma)) <- get
     let dt = t - t0
-    dW <- lift stdNormal::StateT (YearFrac, Bachelier) RVar Double
-    let ft = f0 * exp (r * dt) + sqrt(sigma*sigma/2*r * (exp (2 * r * dt) - 1)) * dW
+    dw <- lift stdNormal::StateT (YearFrac, Bachelier) RVar Double
+    let ft = f0 * exp (r * dt) + sqrt(sigma*sigma/2*r * (exp (2 * r * dt) - 1)) * dw
     put (YearFrac t, Bachelier (YearFrac t) (Forward ft) (Rate r) (Vol sigma))
     return ft
 
 
 instance TimeSlice Bachelier Strike where
-  totalVar (Bachelier t _ _ vol) _ = volToTotalVar vol t
+  totalVar (Bachelier t _ _ vol) _ = volToTotalVar t vol
 
 instance ImpliedDensity Bachelier Strike where
   dW _ _ = 0

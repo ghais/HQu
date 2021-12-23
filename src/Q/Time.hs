@@ -5,16 +5,16 @@ module Q.Time
         , module Q.Time.DayCounter
         , parseDay
         , parseLocalTime
+        , dayToString
+        , dateToString
         ) where
 
 
-import           Data.ByteString.Char8    (unpack)
-import           Data.Csv                 (FromField(..), ToField , toField)
-import           Data.Maybe               (fromJust)
-import           Data.Time
+import           Data.Time (Day, LocalTime (LocalTime), TimeOfDay, midnight)
 
-import           Data.Time.Format.ISO8601
-
+import           Data.Time.Format.ISO8601 (Format, FormatExtension (BasicFormat), calendarFormat,
+                                           formatParseM, formatShow, localTimeFormat,
+                                           timeOfDayFormat)
 import           Q.Time.Date
 import           Q.Time.DayCounter
 
@@ -34,19 +34,20 @@ parseDay = formatParseM dayFormat'
 
 
 -- | basic ISO08601 date/time format.
+localTimeFormat' :: Format LocalTime
 localTimeFormat' = localTimeFormat dayFormat' timeFormat'
+
 -- | basic ISO08601 time format.
+timeFormat' :: Format TimeOfDay
 timeFormat' = timeOfDayFormat BasicFormat
+
 -- | basic ISO08601 day format.
+dayFormat' :: Format Day
 dayFormat' = calendarFormat BasicFormat
 
 -- | Format a date as an basic ISO08601 format.
 dateToString :: LocalTime -> String
 dateToString = formatShow localTimeFormat'
 
-
-instance ToField Day where
-   toField d = toField $ formatShow dayFormat' d
-instance FromField Day where
-  parseField s = pure $ fromJust (parseDay (unpack s))
-
+dayToString :: Day -> String
+dayToString = formatShow dayFormat'

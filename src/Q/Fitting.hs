@@ -4,8 +4,11 @@ module Q.Fitting
 
 
 
-newtype Model r s = Model {unmodel :: [r] -> [s]}
+newtype Model r s = Model {unMoldel :: [r] -> [s]}
 
 class Fittable f r s where
-  fittableNumParams :: f -> Int
-  fittableModel :: f -> [r] -> [s]
+  fittableNumParams    :: f -> Int
+  fittableModel        :: f -> Model r s
+  fittableSample       :: f -> [s]
+  fittableIniitalGuess :: f -> [r]
+  fittableBounds       :: f -> [(r, r)]

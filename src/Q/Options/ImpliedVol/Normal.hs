@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Q.Options.ImpliedVol.Normal
   (
     Method(..)
@@ -12,8 +13,9 @@ import           Numeric.RootFinding as R (RiddersParam (RiddersParam),
                                            ridders)
 import           Q.Options.Bachelier (Bachelier (Bachelier), euOption)
 
-import           Q.Options
-import           Q.Types
+import           Q.Options (Valuation (vPremium), hasTimeValue)
+import           Q.Types (Forward (..), OptionType (..), Premium (..), Rate (..), Strike (..),
+                          Vol (..), YearFrac (YearFrac), discountFactor)
 import           Statistics.Distribution (cumulative, density)
 import           Statistics.Distribution.Normal (standard)
 

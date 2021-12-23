@@ -7,13 +7,18 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Q.Options.ImpliedVol.Surface
   (
     Surface(..)
   , StrikeSpace(..)
   , VolSurface(..)
-  , fwdTotalVarKT)
+  , ConstVolSurface(..)
+  , fwdTotalVarKT
+  , getTenor
+  , surfaceForwardCurve
+  )
 
 where
 
@@ -39,10 +44,10 @@ import Data.Coerce
 
 class (StrikeSpace k) => VolSurface s k where
   surfaceTotalVarKT :: s -> k -> YearFrac -> TotalVar
-  surfaceTotalVarKT s k t = volToTotalVar (surfaceVolKT s k t) t
+  surfaceTotalVarKT s k t = volToTotalVar t (surfaceVolKT s k t)
 
   surfaceVolKT :: s -> k -> YearFrac -> Vol
-  surfaceVolKT s k t = totalVarToVol (surfaceTotalVarKT s k t) t
+  surfaceVolKT s k t = totalVarToVol t (surfaceTotalVarKT s k t)
 
   surfacePremium :: s -> OptionType  -> k -> Spot -> Forward -> YearFrac -> Valuation
   surfacePremium s cp x spot f t = let b76 = B76.Black76 f df t vol
@@ -52,6 +57,11 @@ class (StrikeSpace k) => VolSurface s k where
           df   = 1
           vol  = surfaceVolKT s x t
 
+
+newtype ConstVolSurface = ConstVolSurface Vol
+
+instance (StrikeSpace k) => VolSurface ConstVolSurface k where
+  surfaceTotalVarKT (ConstVolSurface vol) _ t = volToTotalVar t vol
 
 -- | Implied volatility surface where the strikes are in the space of 'k' and
 -- implied volatility time slice is 'v'.
@@ -89,16 +99,18 @@ surfaceAtmTotalVar surface t | t <= t0    = totalVar (smile t0)  atmf * coerce (
         atmf :: k
         atmf    = atmfStrike t s f
 
-instance forall v k. (StrikeSpace k, TimeSlice v k) => VolSurface (Surface v k) Strike where
+instance forall v k. (StrikeSpace k, TimeSlice v k, Show k) => VolSurface (Surface v k) Strike where
   surfaceTotalVarKT s@Surface{..} k t = let x :: k
                                             x = cashToStrikeSpace k t _surfaceSpot (_surfaceForwardCurve t)
                                         in surfaceTotalVarKT s x t
+
+
 
 instance ForwardCurveTermStructure (Surface v k) where
   tsForwardT = _surfaceForwardCurve
   tsSpot     = _surfaceSpot
 
-instance  forall v k. (StrikeSpace k, TimeSlice v k) =>  VolSurface (Surface v k) k where
+instance  forall v k. (StrikeSpace k, TimeSlice v k, Show k) =>  VolSurface (Surface v k) k where
   surfaceTotalVarKT s@Surface{..} k t | t <= minElement _surfaceTenors =
                                           extrapolateTotalVarFrom (minElement _surfaceTenors) s k t
                                       | t >= maxElement _surfaceTenors =
@@ -119,16 +131,12 @@ slnShift surface = case surface ^. surfaceType of
   _                        -> VolShift 0
 
 extrapolateTotalVarFrom :: forall v k. ( TimeSlice v k) =>YearFrac -> Surface v k -> k -> YearFrac -> TotalVar
-extrapolateTotalVarFrom t0 surface@Surface{..} x t = let
+extrapolateTotalVarFrom t0 Surface{..} x t = (totalVar (_surfaceSmiles M.! t0) x') / (coerce  t0) * (coerce t) where
   f0          = _surfaceForwardCurve t0
-  atmVol0     = totalVarToVol (surfaceAtmTotalVar surface t0) t0
-  f           = _surfaceForwardCurve t
   spot        = _surfaceSpot
-  atmTotalVar = surfaceAtmTotalVar surface t
-  atmVol      = totalVarToVol atmTotalVar t
   k'          = strikeSpaceToCash x t0 spot f0
   x'          = cashToStrikeSpace k' t0 spot f0::k
-  in totalVar (_surfaceSmiles M.! t0) x'
+  !mydata      = (x, f0, spot, k', x' )
 
 
 
@@ -136,9 +144,9 @@ timeInterpolate :: TimeSlice v k => TimeInterpolation -> Surface v k -> k -> Yea
 timeInterpolate LinearInVol Surface{..} x t =
   let (t1, smile1) = fromJust $ M.lookupLE t _surfaceSmiles
       (t2, smile2) = fromJust $ M.lookupGT t _surfaceSmiles
-      (Vol vol1)         = totalVarToVol (totalVar smile1 x) t1
-      (Vol vol2)         = totalVarToVol (totalVar smile2 x) t2
-  in volToTotalVar (Vol $ linearInterpolate (t1, vol1) (t2, vol2) t) t
+      (Vol vol1)         = totalVarToVol t1 (totalVar smile1 x)
+      (Vol vol2)         = totalVarToVol t2 (totalVar smile2 x)
+  in volToTotalVar t (Vol $ linearInterpolate (t1, vol1) (t2, vol2) t)
 
 timeInterpolate LinearInTotalVar Surface{..} x t =
   let (t1, smile1) = fromJust $ M.lookupLE t _surfaceSmiles
@@ -160,3 +168,7 @@ euOption _ k f df t vol =
 linearInterpolate :: (YearFrac, Double) -> (YearFrac, Double) -> YearFrac -> Double
 linearInterpolate (YearFrac t1, v1) (YearFrac t2, v2) (YearFrac t) =
   v1  + (v2 - v1)*(t - t1) / (t2 - t1)
+
+
+getTenor :: Surface v k -> YearFrac -> Maybe v
+getTenor surface t = M.lookup t (surface ^. surfaceSmiles)

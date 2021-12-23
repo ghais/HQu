@@ -56,10 +56,10 @@ data SVI = RSVI     -- ^ The original raw SVI representation from Gatheral
            Alpha
            Rho
            Sigma
-         deriving Show
+         deriving stock Show
 
 data SSVI = SSVI                   -- ^ Surface SVI with Heston-like parameterization
-            (YearFrac -> TotalVar) -- ^ ATM total variance
+            (YearFrac -> TotalVar)  -- ^ ATM total variance
             Rho                    -- ^ Rho
             Lambda                 -- ^ Lambda
 
@@ -73,8 +73,8 @@ instance VolSurface SSVI LogRelStrike where
 
 
 instance TimeSlice SVI LogRelStrike  where
-  totalVar (RSVI _ (Alpha 𝜶) (Beta 𝜷) (Rho 𝛒) (M 𝐦) (Sigma 𝛔)) (LogRel 𝐤) =
-    TotalVar $ 𝜶 + 𝜷 * (𝛒 * (𝐤 - 𝐦) + sqrt ((𝐤 - 𝐦) ** 2 + 𝛔 * 𝛔))
+  totalVar (RSVI _ (Alpha a) (Beta b) (Rho rho) (M m) (Sigma sigma)) (LogRel x) =
+    TotalVar $  max (a + b * (rho * (x - m) + sqrt ((x-m)**2 + sigma*sigma))) 0
 
   totalVar (JWSVI  ttm v phi p c vtil) k =
     totalVar (jwSVIToR ttm v phi p c vtil) k

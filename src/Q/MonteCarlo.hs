@@ -1,26 +1,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE InstanceSigs           #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE QuantifiedConstraints  #-}
-{-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 
-module Q.MonteCarlo where
+module Q.MonteCarlo
+  (
+    Summary(..)
+  , PathGenerator(..)
+  , Model(..)
+  , MonteCarlo
+  , PathPricer(..)) where
 import           Control.Monad.State
 import           Data.RVar
 
-
-
-
-
-
-
-
-
-
 import Q.Types
+
 
 
 

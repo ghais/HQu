@@ -2,14 +2,14 @@
 module Q.Universe.EQ
 where
 
-import           Data.Aeson (FromJSON (parseJSON), eitherDecode, withObject, (.:))
+import           Data.Aeson (FromJSON (parseJSON), eitherDecode, withObject, (.:), ToJSON (toJSON), object, (.=))
 import qualified Data.Map as M
 import qualified Data.Text as T
 import           Data.Time (Day, addDays, fromGregorian)
 -- -- import qualified Data.Vector as V
 import           Control.Lens (makeLenses, (^.))
-import           Control.Monad.Except (ExceptT (ExceptT), MonadTrans (lift), liftEither, runExceptT)
-import qualified Data.ByteString.Lazy as B
+
+
 import           Data.Coerce (coerce)
 import           Data.List (zip4)
 import           Data.Ord (Down (Down))
@@ -19,7 +19,7 @@ import           GHC.Generics (Generic)
 import           Q.Currencies (fromCode)
 import           Q.Currency (Currency)
 import           Q.Options.ImpliedVol (BSSurface (BSTermSurface), VolType (LogNormal), volKT)
-import           Q.Options.ImpliedVol.InterpolatingSmile (InterpolatingSmile (..))
+import           Q.Options.ImpliedVol.InterpolatingSmile (InterpolatingSmile (..), fitSVI)
 import           Q.Options.ImpliedVol.StrikeInterpolation (ExtrapolationMethod (Constant),
                                                            InterpolationMethod (Cubic),
                                                            mkInterpolator)
@@ -27,19 +27,36 @@ import           Q.Options.ImpliedVol.Surface (Surface (..), VolSurface (surface
 import           Q.Options.ImpliedVol.TimeInterpolation (TimeInterpolation (LinearInTotalVar))
 import qualified Q.SortedVector as SortedVector
 import           Q.TermStructures (NoDiscounting (NoDiscounting),
-                                   YieldTermStructure (yieldDiscountT))
+                                   YieldTermStructure (yieldDiscountT), ForwardCurveTermStructure (tsForwardT))
 import qualified Q.TermStructures.Yield.DiscountCurve as DiscountCurve
 import           Q.Time.DayCounter (DayCounter (Act365_25), dcYearFraction)
 
-import           Q.Universe.IR (DatesAndValues, IR, dDates, dValues, irFromFile, oisCurve)
+import           Q.Universe.IR (DatesAndValues, IR, dDates, dValues, oisCurve)
 
-import           Graphics.Gnuplot.Simple (plotList, Attribute (Title), plotLists)
+import           Data.List (find)
 
 import           Q.IR (Compounding (Continuous))
+import           Q.Options.ImpliedVol.SVI (SVI)
+import           Q.Options.ImpliedVol.TimeSlice (TimeSlice, totalVar)
 import qualified Q.TermStructures.Yield.ZeroCurve as ZeroCurve
 import Q.Types
+    ( Ticker(..),
+      Vol(..),
+      DF(..),
+      Rate(Rate),
+      YearFrac,
+      LogRelStrike(..),
+      Strike(..),
+      Forward(..),
+      Spot(..),
+      logRelStrike,
+      totalVarToVol )
 
 
+
+
+class (TimeSlice smile LogRelStrike) => EqSmile smile where
+  mkSmile :: (YearFrac, Forward, [Strike] , [Vol]) -> Either String smile
 
 
 
@@ -49,6 +66,7 @@ data DivStyle = Absolute
 
 
 instance FromJSON DivStyle
+instance ToJSON DivStyle
 
 data Div = Div
   {
@@ -77,7 +95,7 @@ type EqFwdCurve = Bool     -- ^ Include discrete dividends
                 -> YearFrac -- ^ Time
                 -> Forward  -- ^ Forward
 
-data EqAsset = EqAsset
+data EqAsset v = EqAsset
   {
     _eqRefDate    :: Day
   , _eqTicker     :: Ticker
@@ -88,12 +106,13 @@ data EqAsset = EqAsset
   , _eqBorrowCost :: ZeroCurve.Interpolated
   , _eqFwd        :: EqFwdCurve
   , _eqIR         :: IR
-  , _eqVolSurface :: BSSurface
+  , _eqVolSurface :: Surface v LogRelStrike
   }
 makeLenses ''EqAsset
 
 
-
+instance ForwardCurveTermStructure (EqAsset v) where
+  tsForwardT eq t = (eq ^. eqFwd) False t
 
 data DBSSurface = DBSSurface
   {
@@ -105,23 +124,36 @@ data DBSSurface = DBSSurface
 makeLenses ''DBSSurface
 
 
-mkInterpolatingVolSurface :: Day -> (YearFrac -> Forward) -> DBSSurface -> Either String (Surface (InterpolatingSmile LogRelStrike) LogRelStrike)
-mkInterpolatingVolSurface d fwdCurve surface = let ts = map (dcYearFraction Act365_25  d) (surface ^. dTenors)
-                                                   fs = map fwdCurve ts
-                                                   smiles = map mkInterpolatingSmile  (zip4 ts fs (surface ^. dStrikesMatrix) (surface ^.dVolMatrix))
-                                               in return Surface
-                                                  {
-                                                    _surfaceSpot = coerce $ fwdCurve 0
-                                                  , _surfaceTenors = SortedVector.fromList ts
-                                                  , _surfaceForwardCurve = fwdCurve
-                                                  , _surfaceSmiles = M.fromList (zip ts smiles)
-                                                  , _surfaceTimeInterpolation  = LinearInTotalVar
-                                                  , _surfaceType   = LogNormal
-                                                  }
+getDSmile :: DBSSurface -> Day -> Maybe [(Strike, Vol)]
+getDSmile surface refDate = do
+ let zipped = zip3 (surface ^. dTenors) (surface ^. dStrikesMatrix) (surface ^. dVolMatrix)
+ (_, ks, vs) <- find (\(d, _, _) -> d == refDate) zipped
+ return $ zip ks vs
 
 
-mkInterpolatingSmile ::  (YearFrac, Forward, [Strike] , [Vol]) -> InterpolatingSmile LogRelStrike
-mkInterpolatingSmile (t, f, ks, vs) = StrikeSmile
+mkVolSurface :: (EqSmile v) => Day -> (YearFrac -> Forward) -> DBSSurface -> Either String (Surface v LogRelStrike)
+mkVolSurface d fwdCurve surface = do
+  let ts = map (dcYearFraction Act365_25  d) (surface ^. dTenors)
+      fs = map fwdCurve ts
+  smiles <- mapM mkSmile  (zip4 ts fs (surface ^. dStrikesMatrix) (surface ^.dVolMatrix))
+  return Surface
+    {
+      _surfaceSpot = coerce $ fwdCurve 0
+    , _surfaceTenors = SortedVector.fromList ts
+    , _surfaceForwardCurve = fwdCurve
+    , _surfaceSmiles = M.fromList (zip ts smiles)
+    , _surfaceTimeInterpolation  = LinearInTotalVar
+    , _surfaceType   = LogNormal
+    }
+
+
+mkSviSmile ::  (YearFrac, Forward, [Strike] , [Vol]) -> Either String SVI
+mkSviSmile (t, f, ks, vs) = do
+  smile <- mkInterpolatingSmile (t, f, ks, vs)
+  fitSVI smile [logRelStrike f k | k <- ks]
+
+mkInterpolatingSmile ::  (YearFrac, Forward, [Strike] , [Vol]) -> Either String (InterpolatingSmile LogRelStrike)
+mkInterpolatingSmile (t, f, ks, vs) = return $ StrikeSmile
   {
     _forward = f
   , _tenor   = t
@@ -135,8 +167,8 @@ mkInterpolatingSmile (t, f, ks, vs) = StrikeSmile
 data DEqAsset = DEqAsset
   {
     _dEqRefDate          :: Day
-  , _dEqTicker           :: T.Text
-  , _dEqCurrency         :: T.Text
+  , _dEqTicker           :: String
+  , _dEqCurrency         :: String
   , _dEqIsIndex          :: Bool
   , _dEqSpot             :: Spot
   , _dEqExpectedDiv      :: [Div]
@@ -153,6 +185,8 @@ instance FromJSON DBSSurface where
     <*> (fmap localDay <$> v .: "Tenors")
     <*> ((fmap . fmap) Vol <$> v .: "VolatilityMatrix")
 
+instance ToJSON DBSSurface where
+  toJSON DBSSurface{..} = object ["StrikesMatrix" .= ((coerce _dStrikesMatrix)::[[Double]]), "Tenors" .= _dTenors, "" .= ((coerce _dVolMatrix)::[[Double]])]
 
 instance FromJSON Div where
   parseJSON = withObject "Div" $ \v -> Div
@@ -165,8 +199,8 @@ instance FromJSON Div where
 instance FromJSON DEqAsset where
   parseJSON = withObject "DEqAsset" $ \v -> DEqAsset
       <$> (localDay <$> v .: "RefDate")
-      <*> v .: "RIC"
-      <*> ((v .: "Currency") >>= (.: "Shortcut"))
+      <*> (T.unpack <$> v .: "RIC")
+      <*> ((v .: "Currency") >>= (.: "Shortcut") >>= (return . T.unpack))
       <*> v .: "IsIndex"
       <*> (Spot <$> v .: "Spot")
       <*> v .: "ExpectedDividends"
@@ -217,11 +251,11 @@ lastElement xys = case SortedList.uncons (SortedList.reverse xys) of
 
 
 
-mkEQ :: IR -> DEqAsset -> Either String EqAsset
+mkEQ :: (EqSmile v) => IR -> DEqAsset -> Either String (EqAsset v)
 mkEQ ir dEq = do
   let d = dEq ^. dEqRefDate
       s = dEq ^. dEqSpot
-      r = ir ^. oisCurve
+      r = ir  ^. oisCurve
       q = NoDiscounting
   b  <- mkYieldCurve d (dEq ^. dEqBorrowCost)
   dq <- boostrstrapDiscreteDivCurve d Act365_25 s r b q (dEq ^. dEqExpectedDiv) True
@@ -230,65 +264,23 @@ mkEQ ir dEq = do
                         (DF dqDF) = if includeDiv then yieldDiscountT dq t else 1
                         (DF bDF ) = yieldDiscountT b t
                         (DF rDF ) = yieldDiscountT r t
-  volSurface <- mkInterpolatingVolSurface d (f True) (dEq ^. dEqBsTermVolSurface)
+  volSurface <- mkVolSurface d (f True) (dEq ^. dEqBsTermVolSurface)
   return EqAsset
-    {  _eqRefDate   = d
-    , _eqTicker     = Ticker . T.unpack $ (dEq ^. dEqTicker)
-    , _eqCurrency   = fromCode (T.unpack (dEq ^. dEqCurrency))
+    {
+      _eqRefDate   = d
+    , _eqTicker     = Ticker  (dEq ^. dEqTicker)
+    , _eqCurrency   = fromCode (dEq ^. dEqCurrency)
     , _eqIsIndex    = dEq ^. dEqIsIndex
     , _eqSpot       = dEq ^. dEqSpot
     , _eqDivYield   = dq
     , _eqBorrowCost = b
     , _eqFwd        = f
     , _eqIR         = ir
-    , _eqVolSurface = BSTermSurface (\k t -> totalVarToVol (surfaceTotalVarKT volSurface k t) t)
+    , _eqVolSurface = volSurface
     }
 
-
-irf = "/Users/ghaisissa/Downloads/ir.json"
-eqf = "/Users/ghaisissa/Downloads/eq.json"
-
-deqFromFile :: FilePath -> IO (Either String DEqAsset)
-deqFromFile path = runExceptT $ do
-  f <- lift $ B.readFile path
-  liftEither $  eitherDecode f
-eqFromFile :: FilePath -> FilePath -> IO (Either String EqAsset)
-eqFromFile irPath jsonFile = runExceptT $ do
-  ir <- ExceptT $ irFromFile irPath
-  f <- lift $ B.readFile jsonFile
-  dEQ <- liftEither $  eitherDecode f
-  liftEither $ mkEQ ir dEQ
-
-
-testeq = do
-  eq <- eqFromFile "/Users/ghaisissa/Downloads/ir.json" "/Users/ghaisissa/Downloads/eq.json"
-  case eq of
-    Left str  -> print str
-    Right peq -> testpeq peq
-
-testpeq eq = do
-  --print (eq ^. eqSpot)
-  --print (eq ^. eqIsIndex)
-  --plotCurve (eq ^. eqBorrowCost) "borrow cost"
-  --plotCurve (eq ^. eqDivYield) "div yield"
-  --plotCurve (eq ^. (eqIR . oisCurve)) "ois"
-  --plotFwd ((eq ^. eqFwd) True)
-  plotSurface (eq ^. eqVolSurface)
-plotFwd :: (YearFrac -> Forward) -> IO ()
-plotFwd f = do
-  let ts  = map YearFrac [0, 0.01..10]
-      fwds = map f ts
-  mapM_ print fwds
-  plotList [] (zip (coerce ts::[Double]) (coerce fwds::[Double]))
-
-
-
-plotCurve c title = do
-  let ts  = map YearFrac [0, 0.01..10]
-      dfs = map (yieldDiscountT c) ts
-  mapM_ print dfs
-  plotList [Title title] (zip (coerce ts::[Double]) (coerce dfs::[Double]))
-
+volKT :: (TimeSlice v LogRelStrike) => EqAsset v -> Strike -> YearFrac -> Vol
+volKT asset k t = totalVarToVol t (surfaceTotalVarKT (asset ^. eqVolSurface) k t)
 
 mkYieldCurve :: Day -> DatesAndValues -> Either String ZeroCurve.Interpolated
 mkYieldCurve d curve =
@@ -296,80 +288,9 @@ mkYieldCurve d curve =
 
 
 
-{-plotSurface surface = do
-  let ts  = map (dcYearFraction Act365_25 (fromGregorian 2021 9 17)) [fromGregorian 2021 10 1, fromGregorian 2021 11 1, fromGregorian 2021 12 1, fromGregorian 2022 6 1]
-      xs  = map LogRel [0]--[-1.6,-1.59..1.3]
-      vols :: [[(Double, Double)]]
-      f t = map (\x -> (coerce x, coerce (surfaceTotalVarKT surface x t))) xs
-      vols = map f ts
---  print ts
-  print vols
-  plotLists [Title "Surface"] vols
--}
-plotSurface :: BSSurface  ->  IO ()
-plotSurface BSTermSurface{..} = do
-  let ts  = map YearFrac [0.1, 0.6..10.5]
 
-      f :: YearFrac -> [(Double, Double)]
-      f t = map (\x -> (coerce x, coerce volToTotalVar (volKT x t) t)) strikes
-      vols :: [[(Double, Double)]]
-      vols = map f ts
-    in plotLists [Title "Surface"] vols
+instance EqSmile SVI where
+  mkSmile = mkSviSmile
 
-
-strikes = map Strike [
-  						886.538,
-						1773.076,
-						2216.345,
-						2659.614,
-						2881.2485,
-						3102.883,
-						3324.5175,
-						3546.152,
-						3767.7865,
-						3989.421,
-						4033.7479,
-						4078.0748,
-						4122.4017,
-						4166.7286,
-						4211.0555,
-						4233.21895,
-						4255.3824,
-						4277.54585,
-						4299.7093,
-						4321.87275,
-						4344.0362,
-						4366.19965,
-						4388.3631,
-						4410.52655,
-						4432.69,
-						4454.85345,
-						4477.0169,
-						4499.18035,
-						4521.3438,
-						4543.50725,
-						4565.6707,
-						4587.83415,
-						4609.9976,
-						4632.16105,
-						4654.3245,
-						4698.6514,
-						4742.9783,
-						4787.3052,
-						4831.6321,
-						4875.959,
-						5097.5935,
-						5319.228,
-						5540.8625,
-						5762.497,
-						5984.1315,
-						6205.766,
-						6649.035,
-						7092.304,
-						7535.573,
-						7978.842,
-						8422.111,
-						8865.38,
-						13298.07
-
-                     ]
+instance EqSmile (InterpolatingSmile LogRelStrike) where
+  mkSmile = mkInterpolatingSmile

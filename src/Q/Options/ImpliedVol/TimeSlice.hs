@@ -11,10 +11,10 @@ import Q.Types
 import Q.Options.ImpliedVol.StrikeSpace
 import Data.Coerce (coerce)
 
-class (StrikeSpace k) => TimeSlice v k where
+class (StrikeSpace x) => TimeSlice v x where
   -- | we denote the the Black-Scholes implied volatility \( \sigma_{BS}(k, t) \) and define
   -- the total implied variance by \( \sigma_{BS}^2(k, t)t\)
-  totalVar :: v -> k -> TotalVar
+  totalVar :: v -> x -> TotalVar
 
 
 class (TimeSlice v k) => ImpliedDensity v k where
@@ -34,8 +34,10 @@ class (TimeSlice v k) => ImpliedDensity v k where
   impliedDensity :: v -> k -> Double
 
 
-instance TimeSlice (LogRelStrike -> TotalVar) LogRelStrike  where
+instance (StrikeSpace x) => TimeSlice (x -> TotalVar) x  where
   totalVar f         = f
+
+
 instance ImpliedDensity (LogRelStrike -> TotalVar) LogRelStrike where
   dW f (LogRel k)    = fst $ derivCentral 1e-6 (\ k' -> let (TotalVar w ) = totalVar f (LogRel k') in w) k
   d2W f (LogRel k)   = let w' k' = dW f (LogRel k')

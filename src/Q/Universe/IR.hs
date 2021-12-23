@@ -1,23 +1,21 @@
 module Q.Universe.IR where
-import           Control.Lens.TH
-import           Data.Aeson (FromJSON, eitherDecode, parseJSON, withObject, (.:))
+import           Control.Lens.TH (makeLenses)
+import           Data.Aeson (FromJSON, parseJSON, withObject, (.:))
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           Data.Time (Day)
 import           Data.Time.LocalTime (LocalTime, localDay)
 import           GHC.Generics (Generic)
 import           Q.Currencies (fromCode)
-import           Q.Currency
+import           Q.Currency (Currency)
 import qualified Q.TermStructures.Yield.DiscountCurve as DiscountCurve
-import           Q.Time.Date
+import           Q.Time.Date (Calendar (NullGregorian))
 
-import           Control.Lens
-import           Control.Monad.Except
-import qualified Data.ByteString.Lazy as B
+import           Control.Lens ((^.))
 import           Data.SortedList (toSortedList)
 import           Q.TermStructures.Yield.DiscountCurve (mkDiscountCurve)
-import           Q.Time
-import           Q.Types
+import           Q.Time.DayCounter (DayCounter (Act365_25))
+import           Q.Types (DF (DF), Strike (..))
 
 
 data IR = IR
@@ -78,6 +76,7 @@ data DIR = DIR
   } deriving stock (Generic, Show)
 
 makeLenses ''DIR
+
 instance FromJSON DIR where
   parseJSON = withObject "DIR" $ \v -> DIR
     <$> (localDay <$> v .: "RefDate")
@@ -88,10 +87,6 @@ instance FromJSON DIR where
     <*> v .: "IBOR_6M"
     <*> v .: "IBOR_12M"
 
-
-mkInterpolatedCurve :: Day -> DatesAndValues -> Either String DiscountCurve.Interpolated
-mkInterpolatedCurve d curve =
-  mkDiscountCurve d Act365_25 (toSortedList (zip (curve ^. dDates) (map DF ( curve ^. dValues))))
 
 mkIR :: DIR -> Either String IR
 mkIR DIR{..} = do
@@ -105,12 +100,7 @@ mkIR DIR{..} = do
   return $ IR d cny NullGregorian ois ibor1m ibor3m ibor6m ibor12m
 
 
-
-irFromFile :: FilePath -> IO (Either String IR)
-irFromFile jsonFile = runExceptT $ do
-  f <- lift $ B.readFile jsonFile
-  dIR <- liftEither $  eitherDecode f
-  liftEither $ mkIR dIR
-
-
+mkInterpolatedCurve :: Day -> DatesAndValues -> Either String DiscountCurve.Interpolated
+mkInterpolatedCurve d curve =
+  mkDiscountCurve d Act365_25 (toSortedList (zip (curve ^. dDates) (map DF ( curve ^. dValues))))
 
